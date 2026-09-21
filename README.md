@@ -202,9 +202,3 @@ google-form-auto-fill/
 - **Không sử dụng máy chủ trung gian (Zero Middleman)**: Toàn bộ quá trình gọi API đều diễn ra trực tiếp từ trình duyệt của bạn tới API của Google, OpenAI, Anthropic hoặc OpenRouter.
 - **Lưu trữ bảo mật**: API Key được lưu trong bộ nhớ `chrome.storage.sync` an toàn của trình duyệt Chrome, không bao giờ được gửi tới bất kỳ bên thứ ba nào khác.
 - **Mã nguồn mở 100%**: Toàn bộ mã nguồn minh bạch, người dùng có thể thoải mái kiểm tra và tùy chỉnh theo nhu cầu.
-
----
-
-## 📄 Giấy phép (License)
-
-Dự án được phát hành theo giấy phép mã nguồn mở [MIT License](LICENSE). Đóng góp ý kiến và Pull Requests luôn được hoan nghênh!
