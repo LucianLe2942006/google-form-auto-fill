@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Feedback Survey - Mock Google Form</title>
+  <style>
+    :root {
+      --gf-purple: #673ab7;
+      --gf-bg: #ede7f6;
+      --gf-card-bg: #ffffff;
+      --gf-text: #202124;
+      --gf-text-sec: #70757a;
+      --gf-border: #dadce0;
+    }
+
+    body {
+      background-color: var(--gf-bg);
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      color: var(--gf-text);
+      margin: 0;
+      padding: 30px 16px 80px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .form-container {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-header-card {
+      background: var(--gf-card-bg);
+      border-radius: 8px;
+      border-top: 10px solid var(--gf-purple);
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+
+    .form-header-card h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      font-weight: 400;
+      color: var(--gf-text);
+    }
+
+    .form-header-card p {
+      margin: 0;
+      color: var(--gf-text-sec);
+      font-size: 14px;
+    }
+
+    /* Google Forms standard question container classes */
+    .Qr7Oae, div[role="listitem"] {
+      background: var(--gf-card-bg);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      border: 1px solid transparent;
+      transition: border-color 0.2s, background-color 0.4s;
+    }
+
+    .Qr7Oae:focus-within {
+      border-color: var(--gf-purple);
+    }
+
+    .question-title-row {
+      margin-bottom: 16px;
+    }
+
+    .M7eMe, div[role="heading"] {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--gf-text);
+      display: inline;
+    }
+
+    .v3YIBe {
+      color: #d93025;
+      margin-left: 4px;
+      font-weight: bold;
+    }
+
+    .g4hhxb {
+      font-size: 12px;
+      color: var(--gf-text-sec);
+      margin-top: 4px;
+    }
+
+    /* Inputs */
+    input.whsOnd {
+      width: 100%;
+      max-width: 320px;
+      border: none;
+      border-bottom: 1px solid var(--gf-border);
+      padding: 8px 0;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-bottom-color 0.2s;
+    }
+
+    input.whsOnd:focus {
+      border-bottom: 2px solid var(--gf-purple);
+    }
+
+    textarea.KHxj8b {
+      width: 100%;
+      min-height: 80px;
+      border: none;
+      border-bottom: 1px solid var(--gf-border);
+      padding: 8px 0;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+    }
+
+    textarea.KHxj8b:focus {
+      border-bottom: 2px solid var(--gf-purple);
+    }
+
+    /* Radios & Checkboxes */
+    .options-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    div[role="radio"], div[role="checkbox"] {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #5f6368;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    div[role="radio"] {
+      border-radius: 50%;
+    }
+
+    div[role="radio"][aria-checked="true"] {
+      border-color: var(--gf-purple);
+    }
+
+    div[role="radio"][aria-checked="true"]::after {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: var(--gf-purple);
+      border-radius: 50%;
+    }
+
+    div[role="checkbox"] {
+      border-radius: 2px;
+    }
+
+    div[role="checkbox"][aria-checked="true"] {
+      background: var(--gf-purple);
+      border-color: var(--gf-purple);
+    }
+
+    div[role="checkbox"][aria-checked="true"]::after {
+      content: '✓';
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .aDTYNe {
+      font-size: 14px;
+      color: var(--gf-text);
+    }
+
+    /* Linear Scale */
+    .N3EkYr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 440px;
+      margin-top: 10px;
+    }
+
+    .scale-point {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .scale-label {
+      font-size: 13px;
+      color: var(--gf-text-sec);
+    }
+
+    /* Multiple Choice Grid */
+    .grid-table {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      margin-top: 12px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+
+    .grid-header-row, .grid-row {
+      display: grid;
+      grid-template-columns: 2fr repeat(5, 1fr);
+      align-items: center;
+      padding: 10px 8px;
+    }
+
+    .grid-row:nth-child(even) {
+      background: #f8f9fa;
+    }
+
+    .grid-col-header {
+      font-size: 12px;
+      color: var(--gf-text-sec);
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .grid-row-header {
+      font-size: 14px;
+      color: var(--gf-text);
+      font-weight: 400;
+    }
+
+    .grid-cell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    /* Submit Row */
+    .submit-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+    }
+
+    .btn-submit {
+      background: var(--gf-purple);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .btn-clear {
+      background: transparent;
+      color: var(--gf-purple);
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="form-container">
+  <!-- Page 1: General Info -->
+  <div class="form-page" id="mock-page-1" style="display: flex; flex-direction: column; gap: 16px;">
+    <!-- Form Header -->
+    <div class="form-header-card">
+      <div role="heading" aria-level="1" class="F9yp7e">
+        <h1>Product Experience & Satisfaction Survey</h1>
+      </div>
+      <p>Trang 1 / 2 - Thông tin chung & Đánh giá sơ bộ</p>
+    </div>
+
+  <!-- Question 1: Short Answer -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">What is your role or occupation?</div>
+      <span class="v3YIBe">*</span>
+      <div class="g4hhxb">E.g., Software Engineer, Student, Designer, Product Manager</div>
+    </div>
+    <div class="input-container">
+      <input type="text" class="whsOnd zHQkBf" placeholder="Your answer" autocomplete="off">
+    </div>
+  </div>
+
+  <!-- Question 2: Paragraph -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">What has been your overall experience using our platform?</div>
+      <span class="v3YIBe">*</span>
+      <div class="g4hhxb">Please share what worked well, what was challenging, and your overall thoughts.</div>
+    </div>
+    <div class="input-container">
+      <textarea class="KHxj8b tL9Q4c" placeholder="Your answer"></textarea>
+    </div>
+  </div>
+
+  <!-- Question 3: Multiple Choice (Radio) -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">How often do you use our product?</div>
+      <span class="v3YIBe">*</span>
+    </div>
+    <div class="options-group" role="radiogroup">
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Daily"></div>
+        <span class="aDTYNe">Daily</span>
+      </div>
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Several times a week"></div>
+        <span class="aDTYNe">Several times a week</span>
+      </div>
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Once a month or less"></div>
+        <span class="aDTYNe">Once a month or less</span>
+      </div>
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="I have never used it / Not sure"></div>
+        <span class="aDTYNe">I have never used it / Not sure</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question 4: Checkboxes -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">Which key aspects do you care about the most?</div>
+      <div class="g4hhxb">Select all that apply.</div>
+    </div>
+    <div class="options-group">
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Speed & Performance</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">User Interface & Design</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Customer Support & Help</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Pricing & Affordability</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Security & Privacy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question 4b: Checkboxes with Explicit Constraint -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">Những tính năng bạn muốn ưu tiên nâng cấp nhất?</div>
+      <span class="v3YIBe">*</span>
+      <div class="g4hhxb">Chọn chính xác 2 mục</div>
+      <div class="RHiN0e" role="alert" style="color: #d93025; font-size: 12px; margin-top: 4px;">Chọn chính xác 2 mục</div>
+    </div>
+    <div class="options-group">
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">AI Smart Autofill Speed</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Multi-language Translation</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Cloud Sync & Profiles</span>
+      </div>
+      <div class="option-item" onclick="toggleMockCheckbox(this)">
+        <div role="checkbox" aria-checked="false"></div>
+        <span class="aDTYNe">Custom Persona Templates</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 1 Navigation Footer -->
+  <div class="submit-row">
+    <div role="button" jsname="OCpkoe" class="btn-submit btn-next" onclick="goToMockPage(2)">Tiếp theo</div>
+    <button type="button" class="btn-clear" onclick="clearForm()">Clear form</button>
+  </div>
+</div> <!-- End of Page 1 -->
+
+<!-- Page 2: Detailed Rating -->
+<div class="form-page" id="mock-page-2" style="display: none; flex-direction: column; gap: 16px;">
+  <div class="form-header-card">
+    <div role="heading" aria-level="1" class="F9yp7e">
+      <h1>Đánh giá chi tiết & Mức độ hài lòng</h1>
+    </div>
+    <p>Trang 2 / 2 - Tiêu chí dịch vụ và mức độ giới thiệu</p>
+  </div>
+
+  <!-- Question 5: Linear Rating Scale -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">On a scale of 1 to 5, how satisfied are you with our service?</div>
+      <span class="v3YIBe">*</span>
+    </div>
+    <div class="N3EkYr" role="radiogroup">
+      <span class="scale-label">Very Dissatisfied</span>
+      <div class="scale-point" onclick="selectMockRadio(this)">
+        <span class="scale-num">1</span>
+        <div role="radio" aria-checked="false" data-value="1"></div>
+      </div>
+      <div class="scale-point" onclick="selectMockRadio(this)">
+        <span class="scale-num">2</span>
+        <div role="radio" aria-checked="false" data-value="2"></div>
+      </div>
+      <div class="scale-point" onclick="selectMockRadio(this)">
+        <span class="scale-num">3</span>
+        <div role="radio" aria-checked="false" data-value="3"></div>
+      </div>
+      <div class="scale-point" onclick="selectMockRadio(this)">
+        <span class="scale-num">4</span>
+        <div role="radio" aria-checked="false" data-value="4"></div>
+      </div>
+      <div class="scale-point" onclick="selectMockRadio(this)">
+        <span class="scale-num">5</span>
+        <div role="radio" aria-checked="false" data-value="5"></div>
+      </div>
+      <span class="scale-label">Very Satisfied</span>
+    </div>
+  </div>
+
+  <!-- Question 6: Recommendation (Radio) -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">Would you recommend our product to your colleagues or friends?</div>
+      <span class="v3YIBe">*</span>
+    </div>
+    <div class="options-group" role="radiogroup">
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Definitely Yes"></div>
+        <span class="aDTYNe">Definitely Yes</span>
+      </div>
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Maybe / Uncertain"></div>
+        <span class="aDTYNe">Maybe / Uncertain</span>
+      </div>
+      <div class="option-item" onclick="selectMockRadio(this)">
+        <div role="radio" aria-checked="false" data-value="Probably Not"></div>
+        <span class="aDTYNe">Probably Not</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question 7: Multiple Choice Grid (Lưới trắc nghiệm) -->
+  <div class="Qr7Oae" role="listitem">
+    <div class="question-title-row">
+      <div role="heading" aria-level="3" class="M7eMe">Đánh giá các tiêu chí dịch vụ của chúng tôi</div>
+      <span class="v3YIBe">*</span>
+      <div class="g4hhxb">Câu hỏi này yêu cầu một câu trả lời mỗi dòng</div>
+    </div>
+    <div class="grid-table" role="table">
+      <!-- Column headers -->
+      <div class="grid-header-row" role="row">
+        <div class="grid-cell-empty"></div>
+        <div class="grid-col-header" role="columnheader">Rất kém</div>
+        <div class="grid-col-header" role="columnheader">Kém</div>
+        <div class="grid-col-header" role="columnheader">Bình thường</div>
+        <div class="grid-col-header" role="columnheader">Tốt</div>
+        <div class="grid-col-header" role="columnheader">Rất tốt</div>
+      </div>
+      <!-- Row 1 -->
+      <div class="grid-row" role="radiogroup" aria-label="Tốc độ phản hồi">
+        <div class="grid-row-header" role="rowheader">Tốc độ phản hồi</div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Tốc độ phản hồi, Rất kém" data-value="Rất kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Tốc độ phản hồi, Kém" data-value="Kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Tốc độ phản hồi, Bình thường" data-value="Bình thường"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Tốc độ phản hồi, Tốt" data-value="Tốt"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Tốc độ phản hồi, Rất tốt" data-value="Rất tốt"></div></div>
+      </div>
+      <!-- Row 2 -->
+      <div class="grid-row" role="radiogroup" aria-label="Chất lượng giải pháp">
+        <div class="grid-row-header" role="rowheader">Chất lượng giải pháp</div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Chất lượng giải pháp, Rất kém" data-value="Rất kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Chất lượng giải pháp, Kém" data-value="Kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Chất lượng giải pháp, Bình thường" data-value="Bình thường"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Chất lượng giải pháp, Tốt" data-value="Tốt"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Chất lượng giải pháp, Rất tốt" data-value="Rất tốt"></div></div>
+      </div>
+      <!-- Row 3 -->
+      <div class="grid-row" role="radiogroup" aria-label="Thái độ hỗ trợ">
+        <div class="grid-row-header" role="rowheader">Thái độ hỗ trợ</div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Thái độ hỗ trợ, Rất kém" data-value="Rất kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Thái độ hỗ trợ, Kém" data-value="Kém"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Thái độ hỗ trợ, Bình thường" data-value="Bình thường"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Thái độ hỗ trợ, Tốt" data-value="Tốt"></div></div>
+        <div class="grid-cell" onclick="selectMockRadio(this)"><div role="radio" aria-checked="false" aria-label="Thái độ hỗ trợ, Rất tốt" data-value="Rất tốt"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 2 Navigation Footer -->
+  <div class="submit-row">
+    <div role="button" jsname="ahS2Le" class="btn-clear btn-back" style="cursor: pointer; font-weight: 500;" onclick="goToMockPage(1)">Quay lại</div>
+    <div role="button" jsname="M2DA7b" class="btn-submit" onclick="alert('Biểu mẫu đã được gửi thành công!')">Gửi</div>
+  </div>
+</div> <!-- End of Page 2 -->
+</div> <!-- End of form-container -->
+
+<script>
+  function goToMockPage(pageNum) {
+    const p1 = document.getElementById('mock-page-1');
+    const p2 = document.getElementById('mock-page-2');
+    if (pageNum === 1) {
+      p1.style.display = 'flex';
+      p2.style.display = 'none';
+    } else {
+      p1.style.display = 'none';
+      p2.style.display = 'flex';
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Simple interactive mock event handlers
+  function selectMockRadio(container) {
+    const parentGroup = container.closest('[role="radiogroup"]') || container.parentElement;
+    const radios = parentGroup.querySelectorAll('div[role="radio"]');
+    radios.forEach(r => r.setAttribute('aria-checked', 'false'));
+    const targetRadio = container.querySelector('div[role="radio"]') || container;
+    targetRadio.setAttribute('aria-checked', 'true');
+  }
+
+  function toggleMockCheckbox(container) {
+    const cb = container.querySelector('div[role="checkbox"]');
+    const checked = cb.getAttribute('aria-checked') === 'true';
+    cb.setAttribute('aria-checked', checked ? 'false' : 'true');
+  }
+
+  function clearForm() {
+    document.querySelectorAll('input[type="text"]').forEach(i => i.value = '');
+    document.querySelectorAll('textarea').forEach(t => t.value = '');
+    document.querySelectorAll('div[role="radio"]').forEach(r => r.setAttribute('aria-checked', 'false'));
+    document.querySelectorAll('div[role="checkbox"]').forEach(c => c.setAttribute('aria-checked', 'false'));
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FormMind - AI Google Form Filler</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <path d="m16 13-3.5 3.5-2-2"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>FormMind</h1>
+          <span class="badge-version">v1.0</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <nav class="nav-tabs">
+          <button class="tab-btn active" data-tab="tab-fill" id="nav-fill-btn" title="Auto-Fill Form">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 2-2 2.5h3L11 10h4L9 22l2-7H8l3-13z"/></svg>
+            <span>Fill</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-inspect" id="nav-inspect-btn" title="Inspect Form Questions">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Inspect</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-settings" id="nav-settings-btn" title="API Keys & Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Keys</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Tab 1: Quick Auto-Fill -->
+    <main class="tab-content active" id="tab-fill">
+      <!-- Active Form Status Card -->
+      <section class="form-status-card" id="form-status-card">
+        <div class="status-indicator-dot" id="status-dot"></div>
+        <div class="form-status-details">
+          <div class="form-title-row">
+            <span class="status-label" id="status-label">Detecting Google Form...</span>
+          </div>
+          <p class="form-name" id="form-name">Scanning current tab...</p>
+        </div>
+        <button class="btn-icon-refresh" id="btn-refresh-scan" title="Rescan Form">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        </button>
+      </section>
+
+      <!-- Persona / Tone Selector -->
+      <section class="section-group">
+        <div class="section-header">
+          <label class="section-title">Response Persona</label>
+        </div>
+        
+        <div class="persona-grid">
+          <div class="persona-card selected" data-persona="positive">
+            <div class="persona-icon">🌟</div>
+            <div class="persona-info">
+              <span class="persona-name">Positive</span>
+              <span class="persona-desc">High ratings & compliments</span>
+            </div>
+          </div>
+          <div class="persona-card" data-persona="negative">
+            <div class="persona-icon">👎</div>
+            <div class="persona-info">
+              <span class="persona-name">Negative</span>
+              <span class="persona-desc">Critical & low ratings</span>
+            </div>
+          </div>
+          <div class="persona-card" data-persona="idk">
+            <div class="persona-icon">🤷</div>
+            <div class="persona-info">
+              <span class="persona-name">IDK / Neutral</span>
+              <span class="persona-desc">Indifferent, middle ratings</span>
+            </div>
+          </div>
+          <div class="persona-card" data-persona="neutral">
+            <div class="persona-icon">⚖️</div>
+            <div class="persona-info">
+              <span class="persona-name">Balanced</span>
+              <span class="persona-desc">Objective pros & cons</span>
+            </div>
+          </div>
+          <div class="persona-card" data-persona="custom">
+            <div class="persona-icon">🎨</div>
+            <div class="persona-info">
+              <span class="persona-name">Custom</span>
+              <span class="persona-desc">Your custom instructions</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expandable Custom Persona Textarea -->
+        <div class="custom-prompt-container" id="custom-prompt-container" style="display: none;">
+          <textarea 
+            id="custom-persona-input" 
+            placeholder="E.g., 'Act as a 25-year-old student who loves computer science and coffee. Give detailed technical answers.'"
+            rows="2"
+          ></textarea>
+        </div>
+      </section>
+
+      <!-- AI Model Selection (Powered by models.dev) -->
+      <section class="section-group">
+        <div class="section-header">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label class="section-title" for="model-select">AI Engine</label>
+            <a href="https://models.dev" target="_blank" class="badge-modelsdev" title="Model catalog verified via models.dev API">models.dev</a>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button id="btn-sync-models" class="btn-sync-models" title="Sync live model database from models.dev">🔄 Sync</button>
+            <span class="api-status-badge" id="active-api-badge">Gemini Key Ready</span>
+          </div>
+        </div>
+        <div class="select-wrapper">
+          <select id="model-select" class="styled-select">
+            <optgroup label="Google Gemini (models.dev)">
+              <option value="gemini:gemini-3.8-flash" selected data-desc="Google's most intelligent Flash model, engineered for long-horizon software engineering and agents" data-date="2026-09-02">Gemini 3.8 Flash (2026-09-02)</option>
+              <option value="gemini:gemini-3.7-flash" data-desc="High-efficiency Gemini model for agentic workflows and coding" data-date="2026-08-13">Gemini 3.7 Flash (2026-08-13)</option>
+              <option value="gemini:gemini-2.0-flash" data-desc="Next-generation multimodal workhorse model with high speed and low cost" data-date="2025-02-05">Gemini 2.0 Flash (2025-02-05)</option>
+              <option value="gemini:gemini-1.5-flash" data-desc="Fast and versatile multimodal model" data-date="2024-05-14">Gemini 1.5 Flash (2024-05-14)</option>
+            </optgroup>
+            <optgroup label="OpenAI (models.dev)">
+              <option value="openai:gpt-6-astra" data-desc="GPT-6 Astra is OpenAI's most capable model for complex reasoning and coding" data-date="2026-09-04">GPT-6 Astra (2026-09-04)</option>
+              <option value="openai:gpt-5.6-sol" data-desc="Frontier GPT-5.6 model for complex professional work" data-date="2026-07-09">GPT-5.6 Sol (2026-07-09)</option>
+              <option value="openai:gpt-4o-mini" data-desc="Affordable and intelligent small model" data-date="2024-07-18">GPT-4o Mini (2024-07-18)</option>
+            </optgroup>
+            <optgroup label="Anthropic Claude (models.dev)">
+              <option value="anthropic:claude-fable-5-1" data-desc="Claude model for demanding reasoning and long-horizon agentic work" data-date="2026-09-01">Claude Fable 5.1 (2026-09-01)</option>
+              <option value="anthropic:claude-opus-5" data-desc="Strongest Claude Opus model for coding, agents" data-date="2026-07-24">Claude Opus 5 (2026-07-24)</option>
+              <option value="anthropic:claude-3-5-haiku-20241022" data-desc="Fastest Claude 3.5 model" data-date="2024-10-22">Claude 3.5 Haiku (2024-10-22)</option>
+            </optgroup>
+            <optgroup label="OpenRouter (models.dev)">
+              <option value="openrouter:deepseek/deepseek-chat" data-desc="DeepSeek V3 open-weights model" data-date="2024-12-26">DeepSeek V3 (2024-12-26)</option>
+              <option value="openrouter:meta-llama/llama-3.3-70b-instruct" data-desc="Llama 3.3 70B open-weights model" data-date="2024-12-06">Llama 3.3 70B (2024-12-06)</option>
+            </optgroup>
+            <optgroup label="Custom / Other">
+              <option value="custom:custom">⚙️ Tùy chỉnh tên model riêng...</option>
+            </optgroup>
+          </select>
+        </div>
+        <div id="model-meta-info" class="model-meta-info" style="display: none;"></div>
+        <div class="custom-model-container" id="custom-model-container" style="display: none; margin-top: 6px;">
+          <div style="display: flex; gap: 6px;">
+            <select id="custom-provider-select" class="styled-select" style="width: 110px;">
+              <option value="gemini">Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Claude</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+            <input type="text" id="custom-model-name" placeholder="e.g. gemini-3.8-flash" class="styled-input" style="flex: 1;">
+          </div>
+        </div>
+      </section>
+
+      <!-- Action Button -->
+      <div class="action-footer">
+        <button id="btn-fill-form" class="btn-primary-glow">
+          <span class="btn-icon">⚡</span>
+          <span class="btn-text">Auto-Fill Form with AI</span>
+        </button>
+        <div class="auto-advance-option" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-secondary); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="chk-auto-advance" checked style="accent-color: var(--primary); cursor: pointer; width: 14px; height: 14px;">
+            <span>Tự động chuyển trang (Multi-page forms)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Live Progress / Feedback Box -->
+      <div id="progress-box" class="progress-box" style="display: none;">
+        <div class="progress-header">
+          <span class="spinner" id="progress-spinner"></span>
+          <span id="progress-text" class="progress-text">Processing form...</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Tab 2: Form Inspector -->
+    <section class="tab-content" id="tab-inspect">
+      <div class="section-header">
+        <label class="section-title">Detected Questions</label>
+        <span class="section-sub" id="inspect-count">0 items</span>
+      </div>
+      <div class="questions-list" id="questions-list">
+        <div class="empty-state">
+          <p>No questions detected yet. Navigate to a Google Form tab and click Rescan.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: API Keys & Settings -->
+    <section class="tab-content" id="tab-settings">
+      <div class="section-header">
+        <label class="section-title">API Keys</label>
+      </div>
+
+      <div class="settings-form">
+        <!-- Gemini Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="gemini-key">Google Gemini API Key <span class="badge-free">Free Tier Available</span></label>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link-get-key">Get Free Key &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="gemini-key" placeholder="AIzaSy..." class="styled-input">
+            <button class="btn-test-key" data-provider="gemini" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="gemini-model-select" class="provider-model-select">
+              <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash (Recommended)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+              <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="gemini-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="gemini-feedback"></span>
+        </div>
+
+        <!-- OpenAI Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="openai-key">OpenAI API Key</label>
+            <a href="https://platform.openai.com/api-keys" target="_blank" class="link-get-key">Get Key &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="openai-key" placeholder="sk-..." class="styled-input">
+            <button class="btn-test-key" data-provider="openai" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="openai-model-select" class="provider-model-select">
+              <option value="gpt-6-astra" selected>GPT-6 Astra (2026 Latest)</option>
+              <option value="gpt-5.6-sol">GPT-5.6 Sol</option>
+              <option value="gpt-4o-mini">GPT-4o Mini</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="openai-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="openai-feedback"></span>
+        </div>
+
+        <!-- Anthropic Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="anthropic-key">Anthropic Claude API Key</label>
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" class="link-get-key">Get Key &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="anthropic-key" placeholder="sk-ant-..." class="styled-input">
+            <button class="btn-test-key" data-provider="anthropic" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="anthropic-model-select" class="provider-model-select">
+              <option value="claude-fable-5-1" selected>Claude Fable 5.1 (2026 Latest)</option>
+              <option value="claude-opus-5">Claude Opus 5</option>
+              <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="anthropic-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="anthropic-feedback"></span>
+        </div>
+
+        <!-- OpenRouter Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="openrouter-key">OpenRouter API Key</label>
+            <a href="https://openrouter.ai/keys" target="_blank" class="link-get-key">Get Key &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="openrouter-key" placeholder="sk-or-..." class="styled-input">
+            <button class="btn-test-key" data-provider="openrouter" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="openrouter-model-select" class="provider-model-select">
+              <option value="deepseek/deepseek-chat" selected>DeepSeek V3</option>
+              <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="openrouter-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="openrouter-feedback"></span>
+        </div>
+
+        <button id="btn-save-settings" class="btn-save">
+          <span>💾 Save All Settings</span>
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <script src="models.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+/* FormMind - In-Page Floating UI & Form Highlight Styles */
+
+:root {
+  --fmind-primary: #6366f1;
+  --fmind-primary-hover: #4f46e5;
+  --fmind-bg: rgba(15, 23, 42, 0.92);
+  --fmind-border: rgba(255, 255, 255, 0.15);
+  --fmind-text: #f8fafc;
+  --fmind-text-muted: #94a3b8;
+  --fmind-accent-green: #10b981;
+  --fmind-accent-glow: rgba(99, 102, 241, 0.35);
+}
+
+/* Floating Action Widget */
+#formmind-floating-widget {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fmind-text);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.fmind-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--fmind-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--fmind-border);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2), 0 0 15px var(--fmind-accent-glow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fmind-pill:hover {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.5), 0 0 25px rgba(99, 102, 241, 0.5);
+  transform: translateY(-2px);
+}
+
+.fmind-logo-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #a5b4fc, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  cursor: pointer;
+}
+
+.fmind-sparkle-icon {
+  font-size: 16px;
+  -webkit-text-fill-color: initial;
+}
+
+.fmind-select-persona,
+.fmind-select-model {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+  transition: border-color 0.2s;
+}
+
+.fmind-select-model {
+  max-width: 145px;
+  text-overflow: ellipsis;
+}
+
+.fmind-select-persona:focus,
+.fmind-select-model:focus {
+  border-color: var(--fmind-primary);
+}
+
+.fmind-select-persona option,
+.fmind-select-model option,
+.fmind-select-model optgroup {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.fmind-btn-fill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  transition: all 0.2s ease;
+}
+
+.fmind-btn-fill:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.6);
+  transform: scale(1.03);
+}
+
+.fmind-btn-fill:active {
+  transform: scale(0.97);
+}
+
+.fmind-btn-fill.loading {
+  opacity: 0.88;
+  pointer-events: none;
+  cursor: wait;
+  animation: fmindPulseBtn 1.2s infinite ease-in-out;
+}
+
+@keyframes fmindPulseBtn {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 4px 18px rgba(168, 85, 247, 0.8);
+    transform: scale(1.02);
+  }
+}
+
+/* Toast Notifications */
+.fmind-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  background: var(--fmind-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--fmind-border);
+  color: #f8fafc;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  animation: fmindSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fmind-toast.success {
+  border-left: 4px solid #10b981;
+}
+
+.fmind-toast.error {
+  border-left: 4px solid #ef4444;
+}
+
+.fmind-toast.info {
+  border-left: 4px solid #6366f1;
+}
+
+@keyframes fmindSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Question Highlight when filled */
+.fmind-highlight-filled {
+  animation: fmindGreenFlash 1.4s ease-out;
+  outline: 2px solid rgba(16, 185, 129, 0.7) !important;
+  border-radius: 8px;
+}
+
+@keyframes fmindGreenFlash {
+  0% {
+    background-color: rgba(16, 185, 129, 0.22);
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
