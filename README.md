@@ -6,12 +6,12 @@
 
 <p align="center">
   <strong>Tiện ích mở rộng Chrome tự động điền biểu mẫu Google Forms bằng AI theo Persona & Cảm xúc tùy chỉnh.</strong><br>
-  Hỗ trợ Google Gemini (Free), OpenAI, Anthropic Claude và OpenRouter với công nghệ đồng bộ từ models.dev.
+  Hỗ trợ Google Gemini (Free), Groq (Ultra-Fast), Hugging Face, OpenAI, Anthropic Claude và OpenRouter với công nghệ đồng bộ từ models.dev.
 </p>
 
 <p align="center">
   <a href="#-cách-cài-đặt-từng-bước-installation"><img src="https://img.shields.io/badge/Chrome-Manifest_V3-blue?style=flat-square" alt="Manifest V3"></a>
-  <a href="#-các-nhà-cung-cấp-ai-hỗ-trợ"><img src="https://img.shields.io/badge/AI_Engine-Gemini_%7C_OpenAI_%7C_Claude_%7C_DeepSeek-orange?style=flat-square" alt="AI Engines"></a>
+  <a href="#-các-nhà-cung-cấp-ai-hỗ-trợ"><img src="https://img.shields.io/badge/AI_Engine-Gemini_%7C_Groq_%7C_HuggingFace_%7C_OpenAI-orange?style=flat-square" alt="AI Engines"></a>
   <a href="#-bảo-mật--quyền-riêng-tư"><img src="https://img.shields.io/badge/Privacy-Local_Only-green?style=flat-square" alt="Privacy First"></a>
   <a href="https://github.com/LucianLe2942006/google-form-auto-fill"><img src="https://img.shields.io/badge/GitHub-Repository-black?style=flat-square" alt="GitHub Repo"></a>
 </p>
@@ -29,7 +29,7 @@
 - 🎯 **Nhận diện ràng buộc thông minh**: Phân tích câu hỏi hộp kiểm để tự động tuân thủ số lượng chọn: *"chọn chính xác 2 mục"*, *"chọn ít nhất 1"*, *"tối đa 3"*,... tránh lỗi validation.
 - 🧩 **Hỗ trợ lưới ma trận (Grid)**: Điền được cả Lưới trắc nghiệm (`grid_radio`) và Lưới hộp kiểm (`grid_checkbox`).
 - 🔘 **Widget nổi tiện dụng (Floating Pill)**: Nằm ngay góc dưới màn hình biểu mẫu, điền form trực tiếp mà không cần bấm mở popup tiện ích.
-- 🔄 **Đồng bộ danh mục Model từ models.dev**: Tích hợp danh sách model mới nhất (Gemini 3.8/2.0/1.5 Flash, GPT-6 Astra, GPT-5.6 Sol, GPT-4o Mini, Claude Fable 5.1, DeepSeek V3,...).
+- 🔄 **Đồng bộ danh mục Model từ models.dev**: Tích hợp danh sách model mới nhất (Gemini 3.8/3.7/2.5 Flash, Groq Llama 3.1 8B Instant, Hugging Face Qwen 2.5 7B Instruct, GPT-6 Astra, Claude Fable 5.1, DeepSeek V3,...).
 - 🛡️ **Tự động phục hồi lỗi Model (Smart Fallback)**: Tự động chuyển về model dự phòng ổn định nếu model được chọn bị lỗi phiên bản API hoặc 404.
 - 🔒 **Bảo mật tuyệt đối**: API Key lưu trữ cục bộ trong trình duyệt, gọi trực tiếp từ client đến máy chủ của nhà cung cấp AI, không qua bất kỳ server trung gian nào.
 
@@ -72,13 +72,15 @@ git clone https://github.com/LucianLe2942006/google-form-auto-fill.git
 
 ---
 
-## 🔑 Hướng Dẫn Lấy API Key (Khuyên dùng Google Gemini Miễn Phí)
+## 🔑 Hướng Dẫn Lấy API Key
 
 Bạn chỉ cần có **một** API Key để sử dụng tiện ích:
 
-| Nhà cung cấp (Provider) | Đề xuất Model | Chi phí | Hướng dẫn lấy Key |
+| Nhà cung cấp (Provider) | Đề xuất Model | Đặc điểm & Chi phí | Hướng dẫn lấy Key |
 | :--- | :--- | :--- | :--- |
-| **Google Gemini** *(Khuyên dùng)* | `gemini-2.0-flash` / `gemini-3.8-flash` | **100% Miễn phí** (Free Tier) | 1. Truy cập [Google AI Studio](https://aistudio.google.com/app/apikey)<br>2. Đăng nhập Google & bấm **Create API key**<br>3. Sao chép chuỗi key bắt đầu bằng `AIza...` |
+| **Google Gemini** *(Khuyên dùng)* | `gemini-3.8-flash` / `gemini-3.7-flash` | **100% Miễn phí** (Free Tier), phản hồi thông minh, chính xác | 1. Truy cập [Google AI Studio](https://aistudio.google.com/app/apikey)<br>2. Đăng nhập Google & bấm **Create API key**<br>3. Sao chép chuỗi key bắt đầu bằng `AIza...` |
+| **Groq** *(Siêu tốc & Tiết kiệm token)* | `openai/gpt-oss-20b` | **Cực nhanh** (~1,000 tps), Free Tier rộng rãi, siêu tiết kiệm token ($0.075/1M), JSON chuẩn | 1. Đăng ký tại [Groq Console](https://console.groq.com/keys)<br>2. Bấm **Create API Key**<br>3. Sao chép key bắt đầu bằng `gsk_...` |
+| **Hugging Face** *(Serverless Router & Tiết kiệm token)* | `meta-llama/Llama-3.1-8B-Instruct` | Router Serverless, chi phí siêu rẻ ($0.02/1M), suy luận chính xác, tuân thủ prompt form chặt chẽ | 1. Truy cập [HF Tokens](https://huggingface.co/settings/tokens)<br>2. Tạo User Access Token (Read/Inference)<br>3. Sao chép key bắt đầu bằng `hf_...` |
 | **OpenAI** | `gpt-4o-mini` / `gpt-6-astra` | Trả phí theo lượt dùng | Đăng ký và lấy key tại [OpenAI Platform](https://platform.openai.com/api-keys) |
 | **Anthropic Claude** | `claude-3-5-haiku` / `claude-fable-5-1` | Trả phí theo lượt dùng | Đăng ký tại [Anthropic Console](https://console.anthropic.com/settings/keys) |
 | **OpenRouter** | `deepseek/deepseek-chat` / `meta-llama/...` | Có model miễn phí / trả phí | Lấy key tại [OpenRouter Keys](https://openrouter.ai/keys) |
@@ -89,9 +91,9 @@ Bạn chỉ cần có **một** API Key để sử dụng tiện ích:
 
 1. Nhấp vào biểu tượng **FormMind** trên thanh công cụ trình duyệt để mở cửa sổ Popup.
 2. Chuyển sang tab **Keys** (ở góc phải thanh điều hướng).
-3. Dán API Key của bạn vào ô tương ứng (ví dụ: Google Gemini API Key).
-4. Nhấn nút **Test** bên cạnh để kiểm tra kết nối (sẽ hiện thông báo `✓ Gemini API Key Valid`).
-5. Chọn model bạn muốn dùng (hoặc để mặc định `Gemini 2.0 Flash` / `Gemini 3.8 Flash`).
+3. Dán API Key của bạn vào ô tương ứng (ví dụ: Google Gemini API Key hoặc Groq API Key).
+4. Nhấn nút **Test** bên cạnh để kiểm tra kết nối (sẽ hiện thông báo xác nhận thành công).
+5. Chọn model bạn muốn dùng (hoặc để mặc định `Gemini 3.8 Flash` hoặc `Llama 3.1 8B Instant`).
 6. Nhấn nút **💾 Save All Settings** ở dưới cùng để lưu lại.
 
 ---
@@ -182,7 +184,7 @@ google-form-auto-fill/
 │   ├── popup.js               # Quản lý sự kiện giao diện, lưu cấu hình, kích hoạt auto-fill
 │   └── models.js              # Quản lý danh mục mô hình, đồng bộ từ models.dev
 ├── data/
-│   ├── models.json            # Cơ sở dữ liệu model ngoại tuyến (Gemini, OpenAI, Claude, OpenRouter)
+│   ├── models.json            # Cơ sở dữ liệu model ngoại tuyến (Gemini, Groq, Hugging Face, OpenAI, Claude, OpenRouter)
 │   └── models.js              # Module xuất dữ liệu model
 ├── icons/
 │   ├── icon16.png             # Biểu tượng 16x16
@@ -199,6 +201,6 @@ google-form-auto-fill/
 
 ## 🔒 Bảo Mật & Quyền Riêng Tư (Privacy & Security)
 
-- **Không sử dụng máy chủ trung gian (Zero Middleman)**: Toàn bộ quá trình gọi API đều diễn ra trực tiếp từ trình duyệt của bạn tới API của Google, OpenAI, Anthropic hoặc OpenRouter.
+- **Không sử dụng máy chủ trung gian (Zero Middleman)**: Toàn bộ quá trình gọi API đều diễn ra trực tiếp từ trình duyệt của bạn tới API của Google, Groq, Hugging Face, OpenAI, Anthropic hoặc OpenRouter.
 - **Lưu trữ bảo mật**: API Key được lưu trong bộ nhớ `chrome.storage.sync` an toàn của trình duyệt Chrome, không bao giờ được gửi tới bất kỳ bên thứ ba nào khác.
 - **Mã nguồn mở 100%**: Toàn bộ mã nguồn minh bạch, người dùng có thể thoải mái kiểm tra và tùy chỉnh theo nhu cầu.

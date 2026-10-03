@@ -129,10 +129,17 @@
         <div class="select-wrapper">
           <select id="model-select" class="styled-select">
             <optgroup label="Google Gemini (models.dev)">
-              <option value="gemini:gemini-3.8-flash" selected data-desc="Google's most intelligent Flash model, engineered for long-horizon software engineering and agents" data-date="2026-09-02">Gemini 3.8 Flash (2026-09-02)</option>
+              <option value="gemini:gemini-3.8-flash" selected data-desc="Google's most intelligent Flash model, engineered for long-horizon software engineering and agents" data-date="2026-09-02">Gemini 3.8 Flash (Recommended)</option>
               <option value="gemini:gemini-3.7-flash" data-desc="High-efficiency Gemini model for agentic workflows and coding" data-date="2026-08-13">Gemini 3.7 Flash (2026-08-13)</option>
-              <option value="gemini:gemini-2.0-flash" data-desc="Next-generation multimodal workhorse model with high speed and low cost" data-date="2025-02-05">Gemini 2.0 Flash (2025-02-05)</option>
-              <option value="gemini:gemini-1.5-flash" data-desc="Fast and versatile multimodal model" data-date="2024-05-14">Gemini 1.5 Flash (2024-05-14)</option>
+              <option value="gemini:gemini-2.5-flash" data-desc="Fast and versatile multimodal model with low latency and balanced resource efficiency" data-date="2025-06-17">Gemini 2.5 Flash (2025-06-17)</option>
+            </optgroup>
+            <optgroup label="Groq (Ultra-Fast & Low-Token)">
+              <option value="groq:openai/gpt-oss-20b" data-desc="OpenAI GPT-OSS 20B on Groq LPU (~1,000 tps), ultra-low token cost and fast JSON form filling" data-date="2026-08-01">GPT-OSS 20B (Groq)</option>
+              <option value="groq:openai/gpt-oss-120b" data-desc="OpenAI GPT-OSS 120B on Groq LPU (~500 tps), flagship open weights reasoning for complex forms" data-date="2026-08-01">GPT-OSS 120B (Groq)</option>
+            </optgroup>
+            <optgroup label="Hugging Face (Low-Token & Serverless)">
+              <option value="huggingface:meta-llama/Llama-3.1-8B-Instruct" data-desc="Meta Llama 3.1 8B on Hugging Face Serverless Router ($0.02/1M), ultra-low cost, smooth instruction following" data-date="2024-07-23">Llama 3.1 8B Instruct (Hugging Face)</option>
+              <option value="huggingface:deepseek-ai/DeepSeek-V4.1-Flash" data-desc="DeepSeek V4.1 Flash on Hugging Face Serverless Router, high speed, superior multilingual comprehension" data-date="2026-09-10">DeepSeek V4.1 Flash (Hugging Face)</option>
             </optgroup>
             <optgroup label="OpenAI (models.dev)">
               <option value="openai:gpt-6-astra" data-desc="GPT-6 Astra is OpenAI's most capable model for complex reasoning and coding" data-date="2026-09-04">GPT-6 Astra (2026-09-04)</option>
@@ -158,6 +165,8 @@
           <div style="display: flex; gap: 6px;">
             <select id="custom-provider-select" class="styled-select" style="width: 110px;">
               <option value="gemini">Gemini</option>
+              <option value="groq">Groq</option>
+              <option value="huggingface">HuggingFace</option>
               <option value="openai">OpenAI</option>
               <option value="anthropic">Claude</option>
               <option value="openrouter">OpenRouter</option>
@@ -223,15 +232,58 @@
           <div class="provider-model-row">
             <span class="provider-model-label">Model:</span>
             <select id="gemini-model-select" class="provider-model-select">
-              <option value="gemini-2.0-flash" selected>Gemini 2.0 Flash (Recommended)</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+              <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash (Recommended)</option>
               <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
               <option value="custom">Tùy chỉnh...</option>
             </select>
             <input type="text" id="gemini-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
           </div>
           <span class="field-feedback" id="gemini-feedback"></span>
+        </div>
+
+        <!-- Groq Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="groq-key">Groq API Key <span class="badge-free">Ultra Fast / Free Tier</span></label>
+            <a href="https://console.groq.com/keys" target="_blank" class="link-get-key">Get Free Key &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="groq-key" placeholder="gsk_..." class="styled-input">
+            <button class="btn-test-key" data-provider="groq" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="groq-model-select" class="provider-model-select">
+              <option value="openai/gpt-oss-20b" selected>GPT-OSS 20B (Recommended)</option>
+              <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="groq-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="groq-feedback"></span>
+        </div>
+
+        <!-- Hugging Face Key -->
+        <div class="key-field-group">
+          <div class="field-header">
+            <label for="huggingface-key">Hugging Face User Access Token <span class="badge-free">Serverless Free Credits</span></label>
+            <a href="https://huggingface.co/settings/tokens" target="_blank" class="link-get-key">Get Token &rarr;</a>
+          </div>
+          <div class="input-with-actions">
+            <input type="password" id="huggingface-key" placeholder="hf_..." class="styled-input">
+            <button class="btn-test-key" data-provider="huggingface" title="Test Connection">Test</button>
+          </div>
+          <div class="provider-model-row">
+            <span class="provider-model-label">Model:</span>
+            <select id="huggingface-model-select" class="provider-model-select">
+              <option value="meta-llama/Llama-3.1-8B-Instruct" selected>Llama 3.1 8B Instruct (Recommended)</option>
+              <option value="deepseek-ai/DeepSeek-V4.1-Flash">DeepSeek V4.1 Flash</option>
+              <option value="custom">Tùy chỉnh...</option>
+            </select>
+            <input type="text" id="huggingface-custom-model" class="styled-input provider-custom-model" placeholder="Model ID..." style="display: none;">
+          </div>
+          <span class="field-feedback" id="huggingface-feedback"></span>
         </div>
 
         <!-- OpenAI Key -->

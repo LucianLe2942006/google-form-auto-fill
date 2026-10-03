@@ -75,6 +75,8 @@ async function handleGenerateAnswers(payload = {}) {
     try {
       const stored = await chrome.storage.sync.get([
         'geminiKey',
+        'groqKey',
+        'huggingfaceKey',
         'openaiKey',
         'anthropicKey',
         'openrouterKey',
@@ -82,6 +84,8 @@ async function handleGenerateAnswers(payload = {}) {
       ]);
       const keyMap = {
         gemini: stored.geminiKey,
+        groq: stored.groqKey,
+        huggingface: stored.huggingfaceKey,
         openai: stored.openaiKey,
         anthropic: stored.anthropicKey,
         openrouter: stored.openrouterKey
@@ -158,11 +162,17 @@ Respond with a JSON object strictly adhering to this structure:
 
   let rawResponseText = '';
 
-  const cleanModel = (model || '').trim().replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+  const cleanModel = (model || '').trim().replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
 
   switch (provider) {
     case 'gemini':
       rawResponseText = await callGeminiAPI({ apiKey, model: cleanModel || 'auto', systemPrompt, userPrompt });
+      break;
+    case 'groq':
+      rawResponseText = await callGroqAPI({ apiKey, model: cleanModel || 'auto', systemPrompt, userPrompt });
+      break;
+    case 'huggingface':
+      rawResponseText = await callHuggingFaceAPI({ apiKey, model: cleanModel || 'auto', systemPrompt, userPrompt });
       break;
     case 'openai':
       rawResponseText = await callOpenAIAPI({ apiKey, model: cleanModel || 'auto', systemPrompt, userPrompt });
@@ -198,12 +208,14 @@ async function resolveGeminiModel(apiKey) {
         .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
         .map(m => m.name.replace(/^models\//, ''));
 
-      // Prioritize verified modern production Flash models: 2.0 -> 1.5 -> 3.8 -> 3.7
-      const bestModel = availableModels.find(m => m === 'gemini-2.0-flash')
-                     || availableModels.find(m => m === 'gemini-1.5-flash')
-                     || availableModels.find(m => m.includes('2.0-flash'))
-                     || availableModels.find(m => m.includes('1.5-flash'))
-                     || availableModels.find(m => m.includes('flash') && !m.includes('2.5') && !m.includes('preview'))
+      // Prioritize verified modern production Flash models: 3.8 -> 3.7 -> 2.5
+      const bestModel = availableModels.find(m => m === 'gemini-3.8-flash')
+                     || availableModels.find(m => m === 'gemini-3.7-flash')
+                     || availableModels.find(m => m === 'gemini-2.5-flash')
+                     || availableModels.find(m => m.includes('3.8-flash'))
+                     || availableModels.find(m => m.includes('3.7-flash'))
+                     || availableModels.find(m => m.includes('2.5-flash'))
+                     || availableModels.find(m => m.includes('flash') && !m.includes('1.5') && !m.includes('2.0') && !m.includes('preview'))
                      || availableModels[0];
 
       if (bestModel) {
@@ -217,19 +229,19 @@ async function resolveGeminiModel(apiKey) {
   }
 
   // Safe verified default
-  return 'gemini-2.0-flash';
+  return 'gemini-3.8-flash';
 }
 
 /**
  * Call Google Gemini API with automatic model sanitation and multi-stage fallback
  */
 async function callGeminiAPI({ apiKey, model, systemPrompt, userPrompt }) {
-  let activeModel = (model || '').trim().replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+  let activeModel = (model || '').trim().replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
   if (!activeModel || activeModel === 'auto') {
     activeModel = cachedGeminiModel || await resolveGeminiModel(apiKey);
   }
   if (!activeModel || activeModel === 'auto') {
-    activeModel = 'gemini-2.0-flash';
+    activeModel = 'gemini-3.8-flash';
   }
 
   const requestBody = {
@@ -247,7 +259,7 @@ async function callGeminiAPI({ apiKey, model, systemPrompt, userPrompt }) {
 
   const executeCall = async (modelName) => {
     // Strictly strip any provider prefix like "gemini:" or "models/" before calling Google endpoint
-    const cleanName = (modelName || '').trim().replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+    const cleanName = (modelName || '').trim().replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cleanName)}:generateContent?key=${apiKey}`;
     return fetch(endpoint, {
       method: 'POST',
@@ -275,8 +287,8 @@ async function callGeminiAPI({ apiKey, model, systemPrompt, userPrompt }) {
     if (isModelError) {
       console.warn(`[FormMind] Model "${activeModel}" failed (${errMsg || response.status}), attempting fallback...`);
 
-      // Fallback priority: 1. Dynamically resolved model from key -> 2. gemini-2.0-flash -> 3. gemini-1.5-flash
-      const candidateFallbacks = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      // Fallback priority: 1. Dynamically resolved model from key -> 2. gemini-3.8-flash -> 3. gemini-3.7-flash -> 4. gemini-2.5-flash
+      const candidateFallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
       try {
         const resolved = await resolveGeminiModel(apiKey);
         if (resolved && !candidateFallbacks.includes(resolved)) {
@@ -313,6 +325,120 @@ async function callGeminiAPI({ apiKey, model, systemPrompt, userPrompt }) {
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     throw new Error('Gemini API returned an empty response.');
+  }
+  return text;
+}
+
+/**
+ * Call Groq API (Ultra-fast, low token cost, OpenAI-compatible)
+ */
+async function callGroqAPI({ apiKey, model, systemPrompt, userPrompt }) {
+  let activeModel = (!model || model === 'auto') ? 'openai/gpt-oss-20b' : model;
+  if (activeModel === 'llama-3.1-8b-instant') {
+    activeModel = 'openai/gpt-oss-20b';
+  }
+  const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+
+  const baseBody = {
+    model: activeModel,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.7
+  };
+
+  let response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({ ...baseBody, response_format: { type: 'json_object' } })
+  });
+
+  // Defensive fallback if provider or model errors on response_format
+  if (!response.ok && response.status === 400) {
+    const errText = await response.clone().text().catch(() => '');
+    if (errText.includes('response_format') || errText.includes('json_object')) {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(baseBody)
+      });
+    }
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData?.error?.message || `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(`Groq API Error: ${message}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('Groq API returned an empty response.');
+  }
+  return text;
+}
+
+/**
+ * Call Hugging Face Inference API via Router (OpenAI-compatible)
+ */
+async function callHuggingFaceAPI({ apiKey, model, systemPrompt, userPrompt }) {
+  let activeModel = (!model || model === 'auto') ? 'meta-llama/Llama-3.1-8B-Instruct' : model;
+  if (activeModel === 'Qwen/Qwen2.5-7B-Instruct') {
+    activeModel = 'meta-llama/Llama-3.1-8B-Instruct';
+  }
+  const endpoint = 'https://router.huggingface.co/v1/chat/completions';
+
+  const baseBody = {
+    model: activeModel,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `${userPrompt}\n\nOutput strictly valid JSON.` }
+    ],
+    temperature: 0.7
+  };
+
+  let response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({ ...baseBody, response_format: { type: 'json_object' } })
+  });
+
+  // Defensive fallback if routed provider does not support response_format { type: 'json_object' }
+  if (!response.ok && response.status === 400) {
+    const errText = await response.clone().text().catch(() => '');
+    if (errText.includes('response_format') || errText.includes('json_object') || errText.includes('schema')) {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(baseBody)
+      });
+    }
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData?.error?.message || `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(`Hugging Face API Error: ${message}`);
+  }
+
+  const data = await response.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error('Hugging Face API returned an empty response.');
   }
   return text;
 }
@@ -493,17 +619,19 @@ async function handleTestApiKey({ provider, apiKey, model }) {
       .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
       .map(m => m.name.replace(/^models\//, ''));
 
-    const cleanModel = (model || '').trim().replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+    const cleanModel = (model || '').trim().replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
 
-    // Respect user's selected model or pick verified modern 2.0 / 1.5
+    // Respect user's selected model or pick verified modern 3.8 / 3.7 / 2.5
     let targetModel = cleanModel;
     if (!targetModel || targetModel === 'auto') {
-      targetModel = models.find(m => m === 'gemini-2.0-flash')
-                 || models.find(m => m === 'gemini-1.5-flash')
-                 || models.find(m => m.includes('2.0-flash'))
-                 || models.find(m => m.includes('1.5-flash'))
-                 || models.find(m => m.includes('flash') && !m.includes('2.5'))
-                 || 'gemini-2.0-flash';
+      targetModel = models.find(m => m === 'gemini-3.8-flash')
+                 || models.find(m => m === 'gemini-3.7-flash')
+                 || models.find(m => m === 'gemini-2.5-flash')
+                 || models.find(m => m.includes('3.8-flash'))
+                 || models.find(m => m.includes('3.7-flash'))
+                 || models.find(m => m.includes('2.5-flash'))
+                 || models.find(m => m.includes('flash') && !m.includes('1.5') && !m.includes('2.0'))
+                 || 'gemini-3.8-flash';
     }
 
     cachedGeminiModel = targetModel;

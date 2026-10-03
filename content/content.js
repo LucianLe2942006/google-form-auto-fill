@@ -937,18 +937,33 @@
       group: 'Google Gemini',
       provider: 'gemini',
       models: [
-        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Recommended)' },
-        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
-        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' }
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Recommended)' },
+        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' }
+      ]
+    },
+    {
+      group: 'Groq',
+      provider: 'groq',
+      models: [
+        { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B (Groq) (Recommended)' },
+        { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B (Groq)' }
+      ]
+    },
+    {
+      group: 'Hugging Face',
+      provider: 'huggingface',
+      models: [
+        { id: 'meta-llama/Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B Instruct (Recommended)' },
+        { id: 'deepseek-ai/DeepSeek-V4.1-Flash', name: 'DeepSeek V4.1 Flash' }
       ]
     },
     {
       group: 'OpenAI',
       provider: 'openai',
       models: [
-        { id: 'gpt-5', name: 'GPT-5' },
-        { id: 'gpt-4o', name: 'GPT-4o' },
+        { id: 'gpt-6-astra', name: 'GPT-6 Astra' },
+        { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini' }
       ]
     },
@@ -956,7 +971,8 @@
       group: 'Anthropic Claude',
       provider: 'anthropic',
       models: [
-        { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet' },
+        { id: 'claude-fable-5-1', name: 'Claude Fable 5.1' },
+        { id: 'claude-opus-5', name: 'Claude Opus 5' },
         { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' }
       ]
     },
@@ -977,12 +993,16 @@
 
     const providerNames = {
       google: 'Google Gemini',
+      groq: 'Groq',
+      huggingface: 'Hugging Face',
       openai: 'OpenAI',
       anthropic: 'Anthropic Claude',
       openrouter: 'OpenRouter'
     };
     const providerKeys = {
       google: 'gemini',
+      groq: 'groq',
+      huggingface: 'huggingface',
       openai: 'openai',
       anthropic: 'anthropic',
       openrouter: 'openrouter'
@@ -996,7 +1016,7 @@
         const pKey = providerKeys[catKey] || catKey;
 
         models.forEach(m => {
-          const cleanId = (m.id || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '');
+          const cleanId = (m.id || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '');
           const opt = document.createElement('option');
           opt.value = `${pKey}:${cleanId}`;
           opt.textContent = m.name || cleanId;
@@ -1009,7 +1029,7 @@
         const groupEl = document.createElement('optgroup');
         groupEl.label = g.group;
         g.models.forEach(m => {
-          const cleanId = (m.id || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '');
+          const cleanId = (m.id || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '');
           const opt = document.createElement('option');
           opt.value = `${g.provider}:${cleanId}`;
           opt.textContent = m.name;
@@ -1040,7 +1060,7 @@
         modelSelect.value = currentVal;
       }
     } else if (modelSelect.options.length > 0) {
-      modelSelect.value = 'gemini:gemini-2.0-flash';
+      modelSelect.value = 'gemini:gemini-3.8-flash';
     }
   }
 
@@ -1064,7 +1084,7 @@
           <span>FormMind</span>
         </div>
         <select class="fmind-select-model" id="fmind-quick-model" title="Chọn AI Model để điền">
-          <option value="gemini:gemini-2.0-flash">Gemini 2.0 Flash</option>
+          <option value="gemini:gemini-3.8-flash">Gemini 3.8 Flash</option>
         </select>
         <select class="fmind-select-persona" id="fmind-quick-persona" title="Chọn phong cách / Tone câu trả lời">
           <option value="positive">🌟 Positive</option>
@@ -1101,7 +1121,7 @@
         if (syncRes && syncRes.defaultPersona && personaSelect) {
           personaSelect.value = syncRes.defaultPersona;
         }
-        const activeModel = (syncRes && syncRes.selectedModel) || 'gemini:gemini-2.0-flash';
+        const activeModel = (syncRes && syncRes.selectedModel) || 'gemini:gemini-3.8-flash';
         populateFloatingModels(modelSelect, localRes ? localRes.syncedModelsDev : null, activeModel);
       });
     });
@@ -1538,11 +1558,13 @@
 
   function getDefaultModelForProvider(provider) {
     switch (provider) {
-      case 'gemini': return 'gemini-2.0-flash';
+      case 'gemini': return 'gemini-3.8-flash';
+      case 'groq': return 'openai/gpt-oss-20b';
+      case 'huggingface': return 'meta-llama/Llama-3.1-8B-Instruct';
       case 'openai': return 'gpt-4o-mini';
       case 'anthropic': return 'claude-3-5-haiku-20241022';
       case 'openrouter': return 'deepseek/deepseek-chat';
-      default: return 'gemini-2.0-flash';
+      default: return 'gemini-3.8-flash';
     }
   }
 
@@ -1562,6 +1584,8 @@
       const settings = await getSyncStorage([
         'provider',
         'geminiKey',
+        'groqKey',
+        'huggingfaceKey',
         'openaiKey',
         'anthropicKey',
         'openrouterKey',
@@ -1572,30 +1596,32 @@
         'customModelName'
       ]);
 
-      let chosenModelVal = quickModelVal || settings.selectedModel || 'gemini:gemini-2.0-flash';
+      let chosenModelVal = quickModelVal || settings.selectedModel || 'gemini:gemini-3.8-flash';
       let chosenProvider = 'gemini';
-      let chosenModel = 'gemini-2.0-flash';
+      let chosenModel = 'gemini-3.8-flash';
 
       if (chosenModelVal.startsWith('custom:')) {
         chosenProvider = settings.customProvider || 'gemini';
-        let rawCustom = settings.customModelName || (chosenProvider === 'gemini' ? 'gemini-2.0-flash' : 'gpt-4o-mini');
-        chosenModel = rawCustom.replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+        let rawCustom = settings.customModelName || (chosenProvider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini');
+        chosenModel = rawCustom.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
       } else if (chosenModelVal.includes(':')) {
         const colonIdx = chosenModelVal.indexOf(':');
         chosenProvider = chosenModelVal.substring(0, colonIdx) || 'gemini';
         let rawM = chosenModelVal.substring(colonIdx + 1);
-        rawM = rawM.replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+        rawM = rawM.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
         if (!rawM || rawM === 'auto') {
           chosenModel = getDefaultModelForProvider(chosenProvider);
         } else {
           chosenModel = rawM;
         }
       } else {
-        chosenModel = chosenModelVal.replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+        chosenModel = chosenModelVal.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
       }
 
       const apiKeyMap = {
         gemini: settings.geminiKey || '',
+        groq: settings.groqKey || '',
+        huggingface: settings.huggingfaceKey || '',
         openai: settings.openaiKey || '',
         anthropic: settings.anthropicKey || '',
         openrouter: settings.openrouterKey || ''

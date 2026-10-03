@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "FormMind - AI Google Form Auto-Filler",
   "version": "1.0.0",
-  "description": "Auto-fills Google Forms with custom AI personas (Positive, Negative, IDK, Custom) using Gemini, OpenAI, Claude, or OpenRouter.",
+  "description": "Auto-fills Google Forms with custom AI personas using Gemini, Groq, Hugging Face, OpenAI, Claude, or OpenRouter.",
   "permissions": [
     "activeTab",
     "storage",
@@ -11,6 +11,8 @@
   "host_permissions": [
     "https://docs.google.com/forms/*",
     "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*",
+    "https://router.huggingface.co/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",
     "https://openrouter.ai/*",
