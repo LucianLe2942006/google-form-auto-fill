@@ -5,20 +5,8 @@ window.MODELS_DEV_CATALOG = {
   "providers": {
     "google": [
       {
-        "id": "gemini-2.0-flash",
-        "name": "Gemini 2.0 Flash (Recommended)",
-        "release_date": "2025-02-05",
-        "description": "Next-generation multimodal workhorse model with high speed and low cost"
-      },
-      {
-        "id": "gemini-1.5-flash",
-        "name": "Gemini 1.5 Flash",
-        "release_date": "2024-05-14",
-        "description": "Fast and versatile multimodal model for high-frequency tasks"
-      },
-      {
         "id": "gemini-3.8-flash",
-        "name": "Gemini 3.8 Flash",
+        "name": "Gemini 3.8 Flash (Recommended)",
         "release_date": "2026-09-02",
         "description": "Google's most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and complex enterprise workflows"
       },
@@ -27,6 +15,12 @@ window.MODELS_DEV_CATALOG = {
         "name": "Gemini 3.7 Flash",
         "release_date": "2026-08-13",
         "description": "High-efficiency Gemini model for agentic workflows, coding, and multimodal reasoning"
+      },
+      {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "release_date": "2025-06-17",
+        "description": "Fast and versatile multimodal model with low latency and balanced resource efficiency"
       },
       {
         "id": "gemini-flash-latest",
@@ -189,6 +183,34 @@ window.MODELS_DEV_CATALOG = {
         "name": "Llama 3.3 70B",
         "release_date": "2024-12-06",
         "description": "State of the art 70B open weight model"
+      }
+    ],
+    "groq": [
+      {
+        "id": "openai/gpt-oss-20b",
+        "name": "GPT-OSS 20B (Groq) (Recommended)",
+        "release_date": "2026-08-01",
+        "description": "OpenAI GPT-OSS 20B on Groq LPU (~1,000 tps), ultra-low token cost and fast structured JSON form filling"
+      },
+      {
+        "id": "openai/gpt-oss-120b",
+        "name": "GPT-OSS 120B (Groq)",
+        "release_date": "2026-08-01",
+        "description": "OpenAI GPT-OSS 120B on Groq LPU (~500 tps), flagship open weights reasoning for complex forms"
+      }
+    ],
+    "huggingface": [
+      {
+        "id": "meta-llama/Llama-3.1-8B-Instruct",
+        "name": "Llama 3.1 8B Instruct (Hugging Face) (Recommended)",
+        "release_date": "2024-07-23",
+        "description": "Meta Llama 3.1 8B on Hugging Face Serverless Router ($0.02/1M), ultra-low token cost and smooth instruction following"
+      },
+      {
+        "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "name": "DeepSeek V4.1 Flash (Hugging Face)",
+        "release_date": "2026-09-10",
+        "description": "DeepSeek V4.1 Flash on Hugging Face Serverless Router, high-speed and superior multilingual comprehension"
       }
     ]
   }

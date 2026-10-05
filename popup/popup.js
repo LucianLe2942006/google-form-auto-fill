@@ -11,8 +11,15 @@
       google: [
         { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', release_date: '2026-09-02', description: "Google's most intelligent Flash model, engineered for long-horizon software engineering, autonomous agents, and enterprise workflows" },
         { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', release_date: '2026-08-13', description: 'High-efficiency Gemini model for agentic workflows, coding, and multimodal reasoning' },
-        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', release_date: '2025-02-05', description: 'Multimodal workhorse model with high speed and low cost' },
-        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', release_date: '2024-05-14', description: 'Fast and versatile multimodal model' }
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', release_date: '2025-06-17', description: 'Fast and versatile multimodal model with low latency and balanced resource efficiency' }
+      ],
+      groq: [
+        { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B (Groq) (Recommended)', release_date: '2026-08-01', description: 'OpenAI GPT-OSS 20B on Groq LPU (~1,000 tps), ultra-low token cost and fast structured JSON form filling' },
+        { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B (Groq)', release_date: '2026-08-01', description: 'OpenAI GPT-OSS 120B on Groq LPU (~500 tps), flagship open weights reasoning for complex forms' }
+      ],
+      huggingface: [
+        { id: 'meta-llama/Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B Instruct (Hugging Face) (Recommended)', release_date: '2024-07-23', description: 'Meta Llama 3.1 8B on Hugging Face Serverless Router ($0.02/1M), ultra-low token cost and smooth instruction following' },
+        { id: 'deepseek-ai/DeepSeek-V4.1-Flash', name: 'DeepSeek V4.1 Flash (Hugging Face)', release_date: '2026-09-10', description: 'DeepSeek V4.1 Flash on Hugging Face Serverless Router, high-speed and superior multilingual comprehension' }
       ],
       openai: [
         { id: 'gpt-6-astra', name: 'GPT-6 Astra', release_date: '2026-09-04', description: "OpenAI's most capable model for complex reasoning, coding, and agentic workflows" },
@@ -62,6 +69,8 @@
     const inspectCount = document.getElementById('inspect-count');
 
     const geminiKeyInput = document.getElementById('gemini-key');
+    const groqKeyInput = document.getElementById('groq-key');
+    const huggingfaceKeyInput = document.getElementById('huggingface-key');
     const openaiKeyInput = document.getElementById('openai-key');
     const anthropicKeyInput = document.getElementById('anthropic-key');
     const openrouterKeyInput = document.getElementById('openrouter-key');
@@ -251,7 +260,15 @@
               source: 'models.dev',
               last_synced: new Date().toISOString(),
               providers: {
-                google: getModels('google', m => m.id.includes('gemini') && m.modalities?.output?.includes('text') && !m.id.includes('image') && !m.id.includes('translate')).slice(0, 10),
+                google: getModels('google', m => m.id.includes('gemini') && m.modalities?.output?.includes('text') && !m.id.includes('image') && !m.id.includes('translate') && !m.id.includes('1.5') && !m.id.includes('2.0')).slice(0, 10),
+                groq: [
+                  { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B (Groq) (Recommended)', release_date: '2026-08-01', description: 'OpenAI GPT-OSS 20B on Groq LPU (~1,000 tps), ultra-low token cost and fast structured JSON form filling' },
+                  { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B (Groq)', release_date: '2026-08-01', description: 'OpenAI GPT-OSS 120B on Groq LPU (~500 tps), flagship open weights reasoning for complex forms' }
+                ],
+                huggingface: [
+                  { id: 'meta-llama/Llama-3.1-8B-Instruct', name: 'Llama 3.1 8B Instruct (Hugging Face) (Recommended)', release_date: '2024-07-23', description: 'Meta Llama 3.1 8B on Hugging Face Serverless Router ($0.02/1M), ultra-low token cost and smooth instruction following' },
+                  { id: 'deepseek-ai/DeepSeek-V4.1-Flash', name: 'DeepSeek V4.1 Flash (Hugging Face)', release_date: '2026-09-10', description: 'DeepSeek V4.1 Flash on Hugging Face Serverless Router, high-speed and superior multilingual comprehension' }
+                ],
                 openai: getModels('openai', m => m.modalities?.output?.includes('text') && !m.id.includes('realtime') && !m.id.includes('audio')).slice(0, 10),
                 anthropic: getModels('anthropic', m => m.modalities?.output?.includes('text') && !m.id.includes('legacy')).slice(0, 10),
                 openrouter: getModels('openrouter', m => (m.id.includes('deepseek') || m.id.includes('llama') || m.id.includes('qwen')) && m.modalities?.output?.includes('text')).slice(0, 10)
@@ -259,8 +276,9 @@
             };
 
             const classicGoogle = [
-              { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', release_date: '2025-02-05', description: 'Multimodal workhorse model with high speed and low cost' },
-              { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', release_date: '2024-05-14', description: 'Fast and versatile multimodal model' }
+              { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Recommended)', release_date: '2026-09-02', description: "Google's most intelligent Flash model, engineered for long-horizon software engineering and agents" },
+              { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', release_date: '2026-08-13', description: 'High-efficiency Gemini model for agentic workflows, coding, and multimodal reasoning' },
+              { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', release_date: '2025-06-17', description: 'Fast and versatile multimodal model with low latency and balanced resource efficiency' }
             ];
             classicGoogle.forEach(cg => {
               if (!newCatalog.providers.google.some(m => m.id === cg.id)) newCatalog.providers.google.push(cg);
@@ -298,6 +316,12 @@
           'geminiKey',
           'geminiModel',
           'geminiCustomModel',
+          'groqKey',
+          'groqModel',
+          'groqCustomModel',
+          'huggingfaceKey',
+          'huggingfaceModel',
+          'huggingfaceCustomModel',
           'openaiKey',
           'openaiModel',
           'openaiCustomModel',
@@ -315,12 +339,55 @@
         ]);
 
         if (data.geminiKey && geminiKeyInput) geminiKeyInput.value = data.geminiKey;
+        if (data.groqKey && groqKeyInput) groqKeyInput.value = data.groqKey;
+        if (data.huggingfaceKey && huggingfaceKeyInput) huggingfaceKeyInput.value = data.huggingfaceKey;
         if (data.openaiKey && openaiKeyInput) openaiKeyInput.value = data.openaiKey;
         if (data.anthropicKey && anthropicKeyInput) anthropicKeyInput.value = data.anthropicKey;
         if (data.openrouterKey && openrouterKeyInput) openrouterKeyInput.value = data.openrouterKey;
 
+        // Auto-migrate legacy/deprecated models from storage
+        const legacyMigrations = {
+          'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
+          'Qwen/Qwen2.5-7B-Instruct': 'meta-llama/Llama-3.1-8B-Instruct',
+          'gemini-1.5-flash': 'gemini-3.8-flash',
+          'gemini-2.0-flash': 'gemini-3.8-flash'
+        };
+
+        let migratedStorage = false;
+        const migrationUpdates = {};
+
+        if (data.groqModel && legacyMigrations[data.groqModel]) {
+          data.groqModel = legacyMigrations[data.groqModel];
+          migrationUpdates.groqModel = data.groqModel;
+          migratedStorage = true;
+        }
+        if (data.huggingfaceModel && legacyMigrations[data.huggingfaceModel]) {
+          data.huggingfaceModel = legacyMigrations[data.huggingfaceModel];
+          migrationUpdates.huggingfaceModel = data.huggingfaceModel;
+          migratedStorage = true;
+        }
+        if (data.geminiModel && legacyMigrations[data.geminiModel]) {
+          data.geminiModel = legacyMigrations[data.geminiModel];
+          migrationUpdates.geminiModel = data.geminiModel;
+          migratedStorage = true;
+        }
+
+        if (data.selectedModel) {
+          Object.entries(legacyMigrations).forEach(([oldId, newId]) => {
+            if (data.selectedModel.includes(oldId)) {
+              data.selectedModel = data.selectedModel.replace(oldId, newId);
+              migrationUpdates.selectedModel = data.selectedModel;
+              migratedStorage = true;
+            }
+          });
+        }
+
+        if (migratedStorage && chrome.storage && chrome.storage.sync) {
+          chrome.storage.sync.set(migrationUpdates);
+        }
+
         // Restore provider-specific models in Keys tab
-        ['gemini', 'openai', 'anthropic', 'openrouter'].forEach(p => {
+        ['gemini', 'groq', 'huggingface', 'openai', 'anthropic', 'openrouter'].forEach(p => {
           const selectEl = document.getElementById(`${p}-model-select`);
           const customEl = document.getElementById(`${p}-custom-model`);
           const savedModel = data[`${p}Model`];
@@ -342,7 +409,7 @@
         });
 
         // Load models catalog from storage or catalog file
-        await initModelCatalog(data.selectedModel || 'gemini:gemini-2.0-flash');
+        await initModelCatalog(data.selectedModel || 'gemini:gemini-3.8-flash');
 
         if (data.customProvider && customProviderSelect) {
           customProviderSelect.value = data.customProvider;
@@ -422,6 +489,8 @@
 
       const providerConfigs = [
         { key: 'google', prefix: 'gemini', label: 'Google Gemini (models.dev)' },
+        { key: 'groq', prefix: 'groq', label: 'Groq (Ultra-Fast & Low-Token)' },
+        { key: 'huggingface', prefix: 'huggingface', label: 'Hugging Face (Low-Token & Multilingual)' },
         { key: 'openai', prefix: 'openai', label: 'OpenAI (models.dev)' },
         { key: 'anthropic', prefix: 'anthropic', label: 'Anthropic Claude (models.dev)' },
         { key: 'openrouter', prefix: 'openrouter', label: 'OpenRouter (models.dev)' }
@@ -435,7 +504,7 @@
         group.label = pc.label;
 
         models.forEach(m => {
-          const cleanId = (m.id || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '');
+          const cleanId = (m.id || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '');
           const opt = document.createElement('option');
           opt.value = `${pc.prefix}:${cleanId}`;
           opt.textContent = `${m.name} (${m.release_date || 'Latest'})`;
@@ -509,11 +578,15 @@
 
       let hasKey = false;
       const gKey = geminiKeyInput ? geminiKeyInput.value.trim() : '';
+      const groqKey = groqKeyInput ? groqKeyInput.value.trim() : '';
+      const hfKey = huggingfaceKeyInput ? huggingfaceKeyInput.value.trim() : '';
       const oKey = openaiKeyInput ? openaiKeyInput.value.trim() : '';
       const aKey = anthropicKeyInput ? anthropicKeyInput.value.trim() : '';
       const orKey = openrouterKeyInput ? openrouterKeyInput.value.trim() : '';
 
       if (provider === 'gemini' && gKey) hasKey = true;
+      if (provider === 'groq' && groqKey) hasKey = true;
+      if (provider === 'huggingface' && hfKey) hasKey = true;
       if (provider === 'openai' && oKey) hasKey = true;
       if (provider === 'anthropic' && aKey) hasKey = true;
       if (provider === 'openrouter' && orKey) hasKey = true;
@@ -667,7 +740,7 @@
      */
     function setupSettingsHandlers() {
       // Toggle custom model input in Keys tab & 2-way sync to Fill tab
-      ['gemini', 'openai', 'anthropic', 'openrouter'].forEach(p => {
+      ['gemini', 'groq', 'huggingface', 'openai', 'anthropic', 'openrouter'].forEach(p => {
         const selectEl = document.getElementById(`${p}-model-select`);
         const customEl = document.getElementById(`${p}-custom-model`);
         if (selectEl) {
@@ -697,6 +770,8 @@
       // Auto-save API keys immediately when typing, pasting, or blurring so in-page floating button always has keys
       const keyInputs = [
         { el: geminiKeyInput, key: 'geminiKey' },
+        { el: groqKeyInput, key: 'groqKey' },
+        { el: huggingfaceKeyInput, key: 'huggingfaceKey' },
         { el: openaiKeyInput, key: 'openaiKey' },
         { el: anthropicKeyInput, key: 'anthropicKey' },
         { el: openrouterKeyInput, key: 'openrouterKey' }
@@ -719,12 +794,18 @@
         btnSaveSettings.addEventListener('click', () => {
           const settings = {
             geminiKey: geminiKeyInput ? geminiKeyInput.value.trim() : '',
+            groqKey: groqKeyInput ? groqKeyInput.value.trim() : '',
+            huggingfaceKey: huggingfaceKeyInput ? huggingfaceKeyInput.value.trim() : '',
             openaiKey: openaiKeyInput ? openaiKeyInput.value.trim() : '',
             anthropicKey: anthropicKeyInput ? anthropicKeyInput.value.trim() : '',
             openrouterKey: openrouterKeyInput ? openrouterKeyInput.value.trim() : '',
 
             geminiModel: getChosenModelForProvider('gemini'),
             geminiCustomModel: document.getElementById('gemini-custom-model')?.value.trim() || '',
+            groqModel: getChosenModelForProvider('groq'),
+            groqCustomModel: document.getElementById('groq-custom-model')?.value.trim() || '',
+            huggingfaceModel: getChosenModelForProvider('huggingface'),
+            huggingfaceCustomModel: document.getElementById('huggingface-custom-model')?.value.trim() || '',
             openaiModel: getChosenModelForProvider('openai'),
             openaiCustomModel: document.getElementById('openai-custom-model')?.value.trim() || '',
             anthropicModel: getChosenModelForProvider('anthropic'),
@@ -807,6 +888,8 @@
 
       const providerMap = {
         gemini: currentCatalog.providers.google || [],
+        groq: currentCatalog.providers.groq || [],
+        huggingface: currentCatalog.providers.huggingface || [],
         openai: currentCatalog.providers.openai || [],
         anthropic: currentCatalog.providers.anthropic || [],
         openrouter: currentCatalog.providers.openrouter || []
@@ -820,7 +903,7 @@
         selectEl.innerHTML = '';
 
         models.forEach(m => {
-          const cleanId = (m.id || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '');
+          const cleanId = (m.id || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '');
           const opt = document.createElement('option');
           opt.value = cleanId;
           opt.textContent = `${m.name} (${m.release_date || 'Latest'})`;
@@ -857,7 +940,7 @@
         }
       }
 
-      modelId = (modelId || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+      modelId = (modelId || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
 
       if (!provider || provider === 'custom') return;
 
@@ -887,7 +970,7 @@
     function syncKeysToFill(provider) {
       if (!modelSelect) return;
       let chosenModel = getChosenModelForProvider(provider);
-      chosenModel = (chosenModel || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+      chosenModel = (chosenModel || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
       const combinedVal = `${provider}:${chosenModel}`;
 
       // 1. Try to find the exact option in modelSelect
@@ -928,16 +1011,18 @@
       } else {
         val = selectEl.value;
       }
-      return (val || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+      return (val || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
     }
 
     function getDefaultModelForProvider(provider) {
       switch (provider) {
-        case 'gemini': return 'gemini-2.0-flash';
+        case 'gemini': return 'gemini-3.8-flash';
+        case 'groq': return 'openai/gpt-oss-20b';
+        case 'huggingface': return 'meta-llama/Llama-3.1-8B-Instruct';
         case 'openai': return 'gpt-4o-mini';
         case 'anthropic': return 'claude-3-5-haiku-20241022';
         case 'openrouter': return 'deepseek/deepseek-chat';
-        default: return 'gemini-2.0-flash';
+        default: return 'gemini-3.8-flash';
       }
     }
 
@@ -968,10 +1053,12 @@
         } else if (modelName === 'auto' || !modelName) {
           modelName = getChosenModelForProvider(provider);
         }
-        modelName = (modelName || '').replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
+        modelName = (modelName || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
 
         const storageKeys = await chrome.storage.sync.get([
           'geminiKey',
+          'groqKey',
+          'huggingfaceKey',
           'openaiKey',
           'anthropicKey',
           'openrouterKey'
@@ -979,6 +1066,8 @@
 
         const apiKeyMap = {
           gemini: storageKeys.geminiKey || (geminiKeyInput ? geminiKeyInput.value.trim() : ''),
+          groq: storageKeys.groqKey || (groqKeyInput ? groqKeyInput.value.trim() : ''),
+          huggingface: storageKeys.huggingfaceKey || (huggingfaceKeyInput ? huggingfaceKeyInput.value.trim() : ''),
           openai: storageKeys.openaiKey || (openaiKeyInput ? openaiKeyInput.value.trim() : ''),
           anthropic: storageKeys.anthropicKey || (anthropicKeyInput ? anthropicKeyInput.value.trim() : ''),
           openrouter: storageKeys.openrouterKey || (openrouterKeyInput ? openrouterKeyInput.value.trim() : '')

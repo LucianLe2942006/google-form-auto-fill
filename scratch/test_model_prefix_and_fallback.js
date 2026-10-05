@@ -7,21 +7,24 @@ console.log('=== TEST 1: Model Name Sanitization ===');
 function sanitizeModelName(model) {
   return (model || '')
     .trim()
-    .replace(/^((gemini|openai|anthropic|openrouter|custom):+)+/i, '')
+    .replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '')
     .replace(/^models\//i, '')
     .trim();
 }
 
 const testCases = [
-  { input: 'gemini:gemini-3.5-flash-lite', expected: 'gemini-3.5-flash-lite' },
-  { input: 'gemini:gemini-2.0-flash', expected: 'gemini-2.0-flash' },
-  { input: 'gemini:gemini:gemini-2.0-flash', expected: 'gemini-2.0-flash' },
-  { input: 'models/gemini-2.0-flash', expected: 'gemini-2.0-flash' },
+  { input: 'gemini:gemini-3.8-flash', expected: 'gemini-3.8-flash' },
+  { input: 'gemini:gemini-3.7-flash', expected: 'gemini-3.7-flash' },
+  { input: 'gemini:gemini-2.5-flash', expected: 'gemini-2.5-flash' },
+  { input: 'gemini:gemini:gemini-3.8-flash', expected: 'gemini-3.8-flash' },
+  { input: 'models/gemini-3.8-flash', expected: 'gemini-3.8-flash' },
+  { input: 'groq:openai/gpt-oss-20b', expected: 'openai/gpt-oss-20b' },
+  { input: 'huggingface:meta-llama/Llama-3.1-8B-Instruct', expected: 'meta-llama/Llama-3.1-8B-Instruct' },
+  { input: 'huggingface:meta-llama/Llama-3.1-8B-Instruct:fastest', expected: 'meta-llama/Llama-3.1-8B-Instruct:fastest' },
   { input: 'openai:gpt-4o-mini', expected: 'gpt-4o-mini' },
   { input: 'anthropic:claude-3-5-haiku-20241022', expected: 'claude-3-5-haiku-20241022' },
   { input: 'openrouter:deepseek/deepseek-chat', expected: 'deepseek/deepseek-chat' },
-  { input: 'custom:my-own-model', expected: 'my-own-model' },
-  { input: 'gemini-2.0-flash', expected: 'gemini-2.0-flash' }
+  { input: 'custom:my-own-model', expected: 'my-own-model' }
 ];
 
 testCases.forEach(({ input, expected }) => {
@@ -34,34 +37,36 @@ console.log('\n=== TEST 2: Floating Button Option Parsing ===');
 
 function parseFloatingSelection(chosenModelVal, settings = {}) {
   let chosenProvider = 'gemini';
-  let chosenModel = 'gemini-2.0-flash';
+  let chosenModel = 'gemini-3.8-flash';
 
   function getDefaultModelForProvider(provider) {
     switch (provider) {
-      case 'gemini': return 'gemini-2.0-flash';
+      case 'gemini': return 'gemini-3.8-flash';
+      case 'groq': return 'openai/gpt-oss-20b';
+      case 'huggingface': return 'meta-llama/Llama-3.1-8B-Instruct';
       case 'openai': return 'gpt-4o-mini';
       case 'anthropic': return 'claude-3-5-haiku-20241022';
       case 'openrouter': return 'deepseek/deepseek-chat';
-      default: return 'gemini-2.0-flash';
+      default: return 'gemini-3.8-flash';
     }
   }
 
   if (chosenModelVal.startsWith('custom:')) {
     chosenProvider = settings.customProvider || 'gemini';
-    let rawCustom = settings.customModelName || (chosenProvider === 'gemini' ? 'gemini-2.0-flash' : 'gpt-4o-mini');
-    chosenModel = rawCustom.replace(/^(gemini|openai|anthropic|openrouter|custom):+/i, '').replace(/^models\//i, '').trim();
+    let rawCustom = settings.customModelName || (chosenProvider === 'gemini' ? 'gemini-3.8-flash' : 'openai/gpt-oss-20b');
+    chosenModel = rawCustom.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
   } else if (chosenModelVal.includes(':')) {
     const colonIdx = chosenModelVal.indexOf(':');
     chosenProvider = chosenModelVal.substring(0, colonIdx) || 'gemini';
     let rawM = chosenModelVal.substring(colonIdx + 1);
-    rawM = rawM.replace(/^(gemini|openai|anthropic|openrouter|custom):+/i, '').replace(/^models\//i, '').trim();
+    rawM = rawM.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
     if (!rawM || rawM === 'auto') {
       chosenModel = getDefaultModelForProvider(chosenProvider);
     } else {
       chosenModel = rawM;
     }
   } else {
-    chosenModel = chosenModelVal.replace(/^(gemini|openai|anthropic|openrouter|custom):+/i, '').replace(/^models\//i, '').trim();
+    chosenModel = chosenModelVal.replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
   }
 
   return { chosenProvider, chosenModel };
@@ -69,25 +74,33 @@ function parseFloatingSelection(chosenModelVal, settings = {}) {
 
 const parseTests = [
   {
-    input: 'gemini:gemini-3.5-flash-lite',
-    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-3.5-flash-lite' }
+    input: 'gemini:gemini-3.8-flash',
+    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-3.8-flash' }
   },
   {
-    input: 'gemini:gemini-2.0-flash',
-    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-2.0-flash' }
+    input: 'groq:openai/gpt-oss-20b',
+    expected: { chosenProvider: 'groq', chosenModel: 'openai/gpt-oss-20b' }
   },
   {
-    input: 'openai:gpt-4o-mini',
-    expected: { chosenProvider: 'openai', chosenModel: 'gpt-4o-mini' }
+    input: 'huggingface:meta-llama/Llama-3.1-8B-Instruct',
+    expected: { chosenProvider: 'huggingface', chosenModel: 'meta-llama/Llama-3.1-8B-Instruct' }
   },
   {
     input: 'gemini:auto',
-    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-2.0-flash' }
+    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-3.8-flash' }
+  },
+  {
+    input: 'groq:auto',
+    expected: { chosenProvider: 'groq', chosenModel: 'openai/gpt-oss-20b' }
+  },
+  {
+    input: 'huggingface:auto',
+    expected: { chosenProvider: 'huggingface', chosenModel: 'meta-llama/Llama-3.1-8B-Instruct' }
   },
   {
     input: 'custom:custom',
-    settings: { customProvider: 'gemini', customModelName: 'gemini:gemini-3.5-flash-lite' },
-    expected: { chosenProvider: 'gemini', chosenModel: 'gemini-3.5-flash-lite' }
+    settings: { customProvider: 'groq', customModelName: 'groq:openai/gpt-oss-20b' },
+    expected: { chosenProvider: 'groq', chosenModel: 'openai/gpt-oss-20b' }
   }
 ];
 
@@ -103,7 +116,7 @@ console.log('\n=== TEST 3: Multi-layer Fallback Simulator ===');
 async function simulateGeminiApiCall(initialModel, mockResponses) {
   let activeModel = sanitizeModelName(initialModel);
   if (!activeModel || activeModel === 'auto') {
-    activeModel = 'gemini-2.0-flash';
+    activeModel = 'gemini-3.8-flash';
   }
 
   const executeCall = async (modelName) => {
@@ -122,7 +135,7 @@ async function simulateGeminiApiCall(initialModel, mockResponses) {
                          errMsg.includes('models/');
 
     if (isModelError) {
-      const candidateFallbacks = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      const candidateFallbacks = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash'];
       let fallbackSucceeded = false;
       for (const fbModel of candidateFallbacks) {
         if (fbModel === activeModel) continue;
@@ -147,49 +160,48 @@ async function simulateGeminiApiCall(initialModel, mockResponses) {
 }
 
 (async () => {
-  // Scenario 1: Initial model fails with the exact error reported by user:
-  // "models/gemini:gemini-3.5-flash-lite is not found for API version v1beta"
+  // Scenario 1: Initial deprecated model fails (e.g. gemini-2.0-flash / 1.5-flash), falls back to 3.8-flash
   const mockResponses1 = {
-    'gemini-3.5-flash-lite': {
-      ok: false,
-      status: 400,
-      error: { message: 'models/gemini-3.5-flash-lite is not found for API version v1beta' }
-    },
     'gemini-2.0-flash': {
+      ok: false,
+      status: 404,
+      error: { message: 'models/gemini-2.0-flash is not found or deprecated' }
+    },
+    'gemini-3.8-flash': {
       ok: true,
       status: 200,
       data: '{"answers": []}'
     }
   };
 
-  const res1 = await simulateGeminiApiCall('gemini:gemini-3.5-flash-lite', mockResponses1);
+  const res1 = await simulateGeminiApiCall('gemini-2.0-flash', mockResponses1);
   assert.strictEqual(res1.success, true);
-  assert.strictEqual(res1.finalModel, 'gemini-2.0-flash');
-  console.log('✅ Scenario 1 (gemini-3.5-flash-lite -> auto-fallback to gemini-2.0-flash): PASSED!');
+  assert.strictEqual(res1.finalModel, 'gemini-3.8-flash');
+  console.log('✅ Scenario 1 (gemini-2.0-flash -> auto-fallback to gemini-3.8-flash): PASSED!');
 
-  // Scenario 2: 2.0 also fails (e.g. rate limit / key tier), falls back to 1.5-flash
+  // Scenario 2: 3.8-flash rate-limited/down, auto-fallback cascade to 3.7-flash
   const mockResponses2 = {
-    'gemini-3.5-flash-lite': {
+    'unknown-experimental-model': {
       ok: false,
       status: 404,
-      error: { message: 'models/gemini-3.5-flash-lite is not found' }
+      error: { message: 'models/unknown-experimental-model is not found' }
     },
-    'gemini-2.0-flash': {
+    'gemini-3.8-flash': {
       ok: false,
       status: 404,
-      error: { message: 'models/gemini-2.0-flash is not found' }
+      error: { message: 'models/gemini-3.8-flash is not found' }
     },
-    'gemini-1.5-flash': {
+    'gemini-3.7-flash': {
       ok: true,
       status: 200,
       data: '{"answers": []}'
     }
   };
 
-  const res2 = await simulateGeminiApiCall('gemini:gemini-3.5-flash-lite', mockResponses2);
+  const res2 = await simulateGeminiApiCall('unknown-experimental-model', mockResponses2);
   assert.strictEqual(res2.success, true);
-  assert.strictEqual(res2.finalModel, 'gemini-1.5-flash');
-  console.log('✅ Scenario 2 (auto-fallback cascade to gemini-1.5-flash): PASSED!');
+  assert.strictEqual(res2.finalModel, 'gemini-3.7-flash');
+  console.log('✅ Scenario 2 (auto-fallback cascade to gemini-3.7-flash): PASSED!');
 
   console.log('\n🎉 ALL TESTS COMPLETED SUCCESSFULLY!');
 })();
