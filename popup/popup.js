@@ -76,14 +76,347 @@
     const openrouterKeyInput = document.getElementById('openrouter-key');
     const btnSaveSettings = document.getElementById('btn-save-settings');
     const testButtons = document.querySelectorAll('.btn-test-key');
+    const settingsFeedback = document.getElementById('settings-feedback');
+
+    // Tab 1 Elements: Form URL and Auto Next
+    const popupFormUrlInput = document.getElementById('popup-form-url');
+    const btnGetCurrentUrl = document.getElementById('btn-get-current-url');
+    const chkAutoAdvance = document.getElementById('chk-auto-advance');
+
+    // Tab 2 Elements: Schedule & Rules
+    const popupCooldownBanner = document.getElementById('popup-cooldown-banner');
+    const popupCooldownTimer = document.getElementById('popup-cooldown-timer');
+    const btnPopupSkipCooldown = document.getElementById('btn-popup-skip-cooldown');
+    const btnPopupCancelCooldown = document.getElementById('btn-popup-cancel-cooldown');
+    const chkCooldownEnabled = document.getElementById('chk-cooldown-enabled');
+    const cooldownMinInput = document.getElementById('cooldown-min-val');
+    const cooldownMaxInput = document.getElementById('cooldown-max-val');
+    const cooldownUnitSelect = document.getElementById('cooldown-unit-select');
+    const chkCooldownAutoSubmit = document.getElementById('chk-cooldown-auto-submit');
+    const chkCooldownAutoRestart = document.getElementById('chk-cooldown-auto-restart');
+    const cooldownPreviewHint = document.getElementById('cooldown-preview-hint');
+
+    const btnAddWeightedRule = document.getElementById('btn-add-weighted-rule');
+    const btnBatchRandomizeRules = document.getElementById('btn-batch-randomize-rules');
+    const btnImportFormRules = document.getElementById('btn-import-form-rules');
+    const weightedRulesContainer = document.getElementById('weighted-rules-container');
+    const rulesEmptyState = document.getElementById('rules-empty-state');
+    const btnSaveSchedule = document.getElementById('btn-save-schedule');
+    const scheduleFeedback = document.getElementById('schedule-feedback');
+    const rulesCountBadge = document.getElementById('rules-count-badge');
+
+    const textRulesContainer = document.getElementById('text-rules-container');
+    const textRulesEmptyState = document.getElementById('text-rules-empty-state');
+    const btnAddTextRule = document.getElementById('btn-add-text-rule');
+    const btnImportFormTextRules = document.getElementById('btn-import-form-text-rules');
+    const btnApplyAllTextMode = document.getElementById('btn-apply-all-text-mode');
+    const globalFixedInput = document.getElementById('global-fixed-input');
+    const globalListTextarea = document.getElementById('global-list-textarea');
+    const globalFixedContainer = document.getElementById('global-fixed-container');
+    const globalListContainer = document.getElementById('global-list-container');
+    const globalModeRadios = document.querySelectorAll('input[name="global-text-mode"]');
+
+    const profileModeRadios = document.querySelectorAll('input[name="profile-mode"]');
+    const profileCustomContainer = document.getElementById('profile-custom-container');
+    const profileCustomTextarea = document.getElementById('profile-custom-textarea');
 
     // Internal State - all declared at top
     let currentTab = null;
     let formQuestions = [];
+    let hasFormNextPage = false;
     let selectedPersona = 'positive';
     let isGoogleForm = false;
     let isFillInProgress = false;
     let currentCatalog = (typeof window !== 'undefined' && window.MODELS_DEV_CATALOG) ? window.MODELS_DEV_CATALOG : FALLBACK_CATALOG;
+    let currentWeightedRules = [];
+    let currentTextRules = [];
+    let currentProfileConfig = {
+      mode: 'skip',
+      customText: ''
+    };
+    let globalTextConfig = {
+      type: 'text',
+      mode: 'fixed',
+      fixedValue: 'Không có ý kiến gì thêm',
+      listValues: [
+        'Dịch vụ rất tốt, nhân viên nhiệt tình',
+        'Sản phẩm dùng ổn trong tầm giá',
+        'Cần cải thiện tốc độ giao hàng',
+        'Rất hài lòng với trải nghiệm lần này'
+      ]
+    };
+
+    let globalUpdateScheduleCooldown = null;
+    let globalUpdateWeightedRules = null;
+    let globalUpdateTextRules = null;
+    let globalRenderRules = null;
+    let globalRenderTextRules = null;
+    let globalUpdateCooldownHint = null;
+    let globalUpdateGlobalModeUI = null;
+
+    /**
+     * Unified Storage: reads from local and sync, merging them
+     */
+    async function unifiedStorageGet(keys) {
+      let syncData = {};
+      let localData = {};
+      try {
+        if (chrome?.storage?.sync) {
+          syncData = (await chrome.storage.sync.get(keys)) || {};
+        }
+      } catch (e) {
+        console.warn('sync.get warning:', e);
+      }
+      try {
+        if (chrome?.storage?.local) {
+          localData = (await chrome.storage.local.get(keys)) || {};
+        }
+      } catch (e) {
+        console.warn('local.get warning:', e);
+      }
+      return { ...syncData, ...localData };
+    }
+
+    /**
+     * Unified Storage: writes to local (guaranteed, fast, no rate-limits) and mirrors to sync
+     */
+    async function unifiedStorageSet(items) {
+      if (!items || typeof items !== 'object') return;
+      if (chrome?.storage?.local) {
+        try {
+          await chrome.storage.local.set(items);
+        } catch (e) {
+          console.error('local.set error:', e);
+        }
+      }
+      if (chrome?.storage?.sync) {
+        try {
+          chrome.storage.sync.set(items, () => {
+            if (chrome.runtime.lastError) {
+              console.warn('sync.set warning (non-fatal, local saved):', chrome.runtime.lastError.message);
+            }
+          });
+        } catch (e) {
+          console.warn('sync.set exception (non-fatal, local saved):', e);
+        }
+      }
+    }
+
+    /**
+     * Scrape Cooldown config from DOM
+     */
+    function extractCooldownConfigFromDOM() {
+      return {
+        enabled: chkCooldownEnabled ? chkCooldownEnabled.checked : false,
+        min: parseFloat(cooldownMinInput?.value) || 5,
+        max: parseFloat(cooldownMaxInput?.value) || 15,
+        unit: cooldownUnitSelect?.value || 'm',
+        autoSubmit: chkCooldownAutoSubmit ? chkCooldownAutoSubmit.checked : false,
+        autoRestartFill: chkCooldownAutoRestart ? chkCooldownAutoRestart.checked : true
+      };
+    }
+
+    /**
+     * Scrape Weighted Rules directly from DOM cards so no live edits are missed
+     */
+    function extractWeightedRulesFromDOM() {
+      if (!weightedRulesContainer) return currentWeightedRules;
+      const cards = weightedRulesContainer.querySelectorAll('.rule-card');
+      if (cards.length === 0) return currentWeightedRules;
+
+      const rules = [];
+      cards.forEach((card, idx) => {
+        const existingRule = currentWeightedRules[idx] || {};
+        const matchTypeSelect = card.querySelector('.rule-match-select');
+        const matchValueInput = card.querySelector('.rule-match-input');
+        const titleHintEl = card.querySelector('.rule-title-hint');
+        const ruleTypeSelect = card.querySelector('.rule-type-select');
+
+        const matchType = matchTypeSelect ? matchTypeSelect.value : (existingRule.matchType || 'index');
+        const matchValue = matchValueInput ? matchValueInput.value.trim() : (existingRule.matchValue || String(idx + 1));
+        const titleHint = titleHintEl ? titleHintEl.textContent.trim() : (existingRule.titleHint || '');
+        const type = ruleTypeSelect ? ruleTypeSelect.value : (existingRule.type || 'radio');
+
+        const options = [];
+        const optRows = card.querySelectorAll('.rule-option-row');
+        optRows.forEach((row, oIdx) => {
+          const labelInput = row.querySelector('.rule-option-input');
+          const weightInput = row.querySelector('.rule-weight-input');
+          const existingOpt = (existingRule.options && existingRule.options[oIdx]) || {};
+
+          options.push({
+            label: labelInput ? labelInput.value.trim() : (existingOpt.label || `Lựa chọn ${oIdx + 1}`),
+            weight: weightInput ? (parseFloat(weightInput.value) || 0) : (existingOpt.weight || 0)
+          });
+        });
+
+        rules.push({
+          id: existingRule.id || `rule_${idx + 1}_${Date.now()}`,
+          matchType,
+          matchValue,
+          titleHint,
+          type,
+          options: options.length > 0 ? options : (existingRule.options || [])
+        });
+      });
+
+      currentWeightedRules = rules;
+      return rules;
+    }
+
+    /**
+     * Scrape Text Rules directly from DOM cards
+     */
+    function extractTextRulesFromDOM() {
+      if (!textRulesContainer) return currentTextRules;
+      const cards = textRulesContainer.querySelectorAll('.text-rule-card');
+      if (cards.length === 0) return currentTextRules;
+
+      const rules = [];
+      cards.forEach((card, idx) => {
+        const existingRule = currentTextRules[idx] || {};
+        const matchTypeSelect = card.querySelector('.rule-match-select');
+        const matchValueInput = card.querySelector('.rule-match-input');
+        const titleHintEl = card.querySelector('.rule-title-hint');
+        const checkedRadio = card.querySelector('input[type="radio"]:checked');
+        const fixedInput = card.querySelector('input[data-action="edit-fixed-val"]');
+        const listTextarea = card.querySelector('textarea[data-action="edit-list-val"]');
+
+        const matchType = matchTypeSelect ? matchTypeSelect.value : (existingRule.matchType || 'index');
+        const matchValue = matchValueInput ? matchValueInput.value.trim() : (existingRule.matchValue || String(idx + 1));
+        const titleHint = titleHintEl ? titleHintEl.textContent.trim() : (existingRule.titleHint || '');
+        const mode = checkedRadio ? checkedRadio.value : (existingRule.mode || 'fixed');
+        const fixedValue = fixedInput ? fixedInput.value : (existingRule.fixedValue || '');
+        const listValues = listTextarea ? listTextarea.value.split('\n').map(s => s.trim()).filter(Boolean) : (existingRule.listValues || []);
+
+        rules.push({
+          id: existingRule.id || `text_rule_${idx + 1}_${Date.now()}`,
+          type: 'text',
+          matchType,
+          matchValue,
+          titleHint,
+          mode,
+          fixedValue,
+          listValues
+        });
+      });
+
+      currentTextRules = rules;
+      return rules;
+    }
+
+    /**
+     * Scrape Global Text Default config from DOM
+     */
+    function extractGlobalTextConfigFromDOM() {
+      const selectedRadio = document.querySelector('input[name="global-text-mode"]:checked');
+      const mode = selectedRadio ? selectedRadio.value : (globalTextConfig.mode || 'fixed');
+      const fixedVal = globalFixedInput ? globalFixedInput.value.trim() : (globalTextConfig.fixedValue || '');
+      const listVals = globalListTextarea ? globalListTextarea.value.split('\n').map(s => s.trim()).filter(Boolean) : (globalTextConfig.listValues || []);
+
+      globalTextConfig = {
+        type: 'text',
+        mode,
+        fixedValue: fixedVal,
+        listValues: listVals
+      };
+      return globalTextConfig;
+    }
+
+    /**
+     * Scrape API Keys, Model selection, Persona, and Form URL from DOM
+     */
+    function extractSettingsFromDOM() {
+      return {
+        geminiKey: geminiKeyInput ? geminiKeyInput.value.trim() : '',
+        groqKey: groqKeyInput ? groqKeyInput.value.trim() : '',
+        huggingfaceKey: huggingfaceKeyInput ? huggingfaceKeyInput.value.trim() : '',
+        openaiKey: openaiKeyInput ? openaiKeyInput.value.trim() : '',
+        anthropicKey: anthropicKeyInput ? anthropicKeyInput.value.trim() : '',
+        openrouterKey: openrouterKeyInput ? openrouterKeyInput.value.trim() : '',
+
+        selectedModel: modelSelect ? modelSelect.value : 'gemini:gemini-3.8-flash',
+        geminiModel: getChosenModelForProvider('gemini'),
+        geminiCustomModel: document.getElementById('gemini-custom-model')?.value.trim() || '',
+        groqModel: getChosenModelForProvider('groq'),
+        groqCustomModel: document.getElementById('groq-custom-model')?.value.trim() || '',
+        huggingfaceModel: getChosenModelForProvider('huggingface'),
+        huggingfaceCustomModel: document.getElementById('huggingface-custom-model')?.value.trim() || '',
+        openaiModel: getChosenModelForProvider('openai'),
+        openaiCustomModel: document.getElementById('openai-custom-model')?.value.trim() || '',
+        anthropicModel: getChosenModelForProvider('anthropic'),
+        anthropicCustomModel: document.getElementById('anthropic-custom-model')?.value.trim() || '',
+        openrouterModel: getChosenModelForProvider('openrouter'),
+        openrouterCustomModel: document.getElementById('openrouter-custom-model')?.value.trim() || '',
+
+        defaultPersona: selectedPersona || 'positive',
+        customPersonaPrompt: customInput ? customInput.value : '',
+        formmind_form_url: popupFormUrlInput ? popupFormUrlInput.value.trim() : '',
+        formmind_auto_next: chkAutoAdvance ? chkAutoAdvance.checked : false
+      };
+    }
+
+    /**
+     * Extract Personal Profile config from DOM
+     */
+    function extractProfileConfigFromDOM() {
+      const checkedRadio = document.querySelector('input[name="profile-mode"]:checked');
+      return {
+        mode: checkedRadio ? checkedRadio.value : 'skip',
+        customText: profileCustomTextarea ? profileCustomTextarea.value.trim() : ''
+      };
+    }
+
+    /**
+     * Universal Save function: guarantees EVERYTHING is saved to storage.local and storage.sync
+     */
+    async function saveAllExtensionData(triggerBtn, feedbackEl) {
+      try {
+        const cooldownConfig = extractCooldownConfigFromDOM();
+        const weightedRules = extractWeightedRulesFromDOM();
+        const textRules = extractTextRulesFromDOM();
+        const textGlobal = extractGlobalTextConfigFromDOM();
+        const profileConfig = extractProfileConfigFromDOM();
+        const settings = extractSettingsFromDOM();
+
+        const allPayload = {
+          ...settings,
+          formmind_cooldown_config: cooldownConfig,
+          formmind_weighted_rules: weightedRules,
+          formmind_text_rules: textRules,
+          formmind_text_global_default: textGlobal,
+          formmind_profile_config: profileConfig
+        };
+
+        await unifiedStorageSet(allPayload);
+        updateApiBadge();
+
+        if (triggerBtn) {
+          const originalText = triggerBtn.innerHTML;
+          triggerBtn.innerHTML = '<span>✅ Đã lưu cấu hình!</span>';
+          setTimeout(() => {
+            triggerBtn.innerHTML = originalText;
+          }, 2000);
+        }
+
+        if (feedbackEl) {
+          feedbackEl.className = 'field-feedback success';
+          feedbackEl.textContent = '✅ Đã lưu toàn bộ cấu hình thành công!';
+          setTimeout(() => {
+            if (feedbackEl) feedbackEl.textContent = '';
+          }, 3000);
+        }
+
+        return true;
+      } catch (err) {
+        console.error('Error in saveAllExtensionData:', err);
+        if (feedbackEl) {
+          feedbackEl.className = 'field-feedback error';
+          feedbackEl.textContent = '❌ Lỗi khi lưu cấu hình: ' + (err.message || err);
+        }
+        return false;
+      }
+    }
 
     // Unified progress listener for multi-page updates from content script
     const progressListener = (msg) => {
@@ -144,20 +477,81 @@
       });
 
     /**
-     * Setup tab navigation
+     * Setup tab navigation with lastActiveTab persistence
      */
+    function switchTab(targetId) {
+      if (!targetId) return;
+      tabs.forEach(b => {
+        if (b.getAttribute('data-tab') === targetId) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+      tabContents.forEach(c => {
+        if (c.id === targetId) {
+          c.classList.add('active');
+        } else {
+          c.classList.remove('active');
+        }
+      });
+    }
+
     function setupTabs() {
       tabs.forEach(btn => {
         btn.addEventListener('click', () => {
           const targetId = btn.getAttribute('data-tab');
-          tabs.forEach(b => b.classList.remove('active'));
-          tabContents.forEach(c => c.classList.remove('active'));
-
-          btn.classList.add('active');
-          const targetContent = document.getElementById(targetId);
-          if (targetContent) targetContent.classList.add('active');
+          switchTab(targetId);
+          unifiedStorageSet({ lastActiveTab: targetId });
         });
       });
+    }
+
+    /**
+     * Update Schedule Tab - Module B (Weighted Rules) enabled/disabled state based on active Persona
+     */
+    function updateScheduleRulesState(currentPersona) {
+      const weightedModule = document.getElementById('weighted-rules-module-card');
+      const disabledBanner = document.getElementById('weighted-rules-disabled-banner');
+      const disabledMsg = document.getElementById('weighted-rules-disabled-msg');
+      const btnRandomize = document.getElementById('btn-batch-randomize-rules');
+      const btnImport = document.getElementById('btn-import-form-rules');
+      const btnAddRule = document.getElementById('btn-add-weighted-rule');
+      const ruleInputs = weightedModule ? weightedModule.querySelectorAll('input, select, button') : [];
+
+      const isRandomPersona = currentPersona === 'random';
+
+      if (weightedModule) {
+        if (!isRandomPersona) {
+          weightedModule.classList.add('module-disabled-by-persona');
+          if (disabledBanner) {
+            disabledBanner.style.display = 'flex';
+            if (disabledMsg) {
+              const personaNames = {
+                positive: 'Positive (Tích cực)',
+                negative: 'Negative (Tiêu cực)',
+                idk: 'IDK / Neutral',
+                neutral: 'Balanced (Khách quan)',
+                custom: 'Custom (Tùy chỉnh)'
+              };
+              const pName = personaNames[currentPersona] || currentPersona;
+              disabledMsg.textContent = `🔒 Cấu hình tỉ lệ đang tắt vì đang chọn Persona "${pName}". Hãy chọn Persona "Random" nếu muốn can thiệp tỉ lệ câu hỏi.`;
+            }
+          }
+          // Thực sự disable các tương tác
+          if (btnRandomize) btnRandomize.disabled = true;
+          if (btnImport) btnImport.disabled = true;
+          if (btnAddRule) btnAddRule.disabled = true;
+          ruleInputs.forEach(el => el.disabled = true);
+        } else {
+          weightedModule.classList.remove('module-disabled-by-persona');
+          if (disabledBanner) disabledBanner.style.display = 'none';
+          if (btnRandomize) btnRandomize.disabled = false;
+          if (btnImport) btnImport.disabled = false;
+          if (btnAddRule) btnAddRule.disabled = false;
+          ruleInputs.forEach(el => el.disabled = false);
+        }
+      }
     }
 
     /**
@@ -177,17 +571,21 @@
             if (customContainer) customContainer.style.display = 'none';
           }
 
-          if (chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ defaultPersona: selectedPersona });
-          }
+          unifiedStorageSet({ defaultPersona: selectedPersona });
+          updateScheduleRulesState(selectedPersona);
         });
       });
 
       if (customInput) {
+        let customInputDebounce = null;
         customInput.addEventListener('input', () => {
-          if (chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ customPersonaPrompt: customInput.value });
-          }
+          clearTimeout(customInputDebounce);
+          customInputDebounce = setTimeout(() => {
+            unifiedStorageSet({ customPersonaPrompt: customInput.value });
+          }, 300);
+        });
+        customInput.addEventListener('blur', () => {
+          unifiedStorageSet({ customPersonaPrompt: customInput.value });
         });
       }
     }
@@ -203,9 +601,7 @@
           } else {
             if (customModelContainer) customModelContainer.style.display = 'none';
           }
-          if (chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ selectedModel: modelSelect.value });
-          }
+          unifiedStorageSet({ selectedModel: modelSelect.value });
           syncFillToKeys(modelSelect.value);
           updateApiBadge();
           updateModelMeta();
@@ -214,9 +610,7 @@
 
       if (customProviderSelect) {
         customProviderSelect.addEventListener('change', () => {
-          if (chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ customProvider: customProviderSelect.value });
-          }
+          unifiedStorageSet({ customProvider: customProviderSelect.value });
           if (modelSelect && modelSelect.value === 'custom:custom') {
             syncFillToKeys('custom:custom');
           }
@@ -225,13 +619,18 @@
       }
 
       if (customModelName) {
+        let customModelDebounce = null;
         customModelName.addEventListener('input', () => {
-          if (chrome.storage && chrome.storage.sync) {
-            chrome.storage.sync.set({ customModelName: customModelName.value.trim() });
-          }
+          clearTimeout(customModelDebounce);
+          customModelDebounce = setTimeout(() => {
+            unifiedStorageSet({ customModelName: customModelName.value.trim() });
+          }, 300);
           if (modelSelect && modelSelect.value === 'custom:custom') {
             syncFillToKeys('custom:custom');
           }
+        });
+        customModelName.addEventListener('blur', () => {
+          unifiedStorageSet({ customModelName: customModelName.value.trim() });
         });
       }
 
@@ -312,9 +711,12 @@
     /**
      * Load saved settings and keys from storage
      */
+    /**
+     * Load saved settings and keys from storage (unified local + sync)
+     */
     async function loadSavedSettings() {
       try {
-        const data = await chrome.storage.sync.get([
+        const data = await unifiedStorageGet([
           'geminiKey',
           'geminiModel',
           'geminiCustomModel',
@@ -337,17 +739,27 @@
           'customProvider',
           'customModelName',
           'defaultPersona',
-          'customPersonaPrompt'
+          'customPersonaPrompt',
+          'lastActiveTab',
+          'formmind_form_url',
+          'formmind_auto_next',
+          'formmind_cooldown_config',
+          'formmind_cooldown_state',
+          'formmind_weighted_rules',
+          'formmind_text_rules',
+          'formmind_text_global_default',
+          'formmind_profile_config'
         ]);
 
-        if (data.geminiKey && geminiKeyInput) geminiKeyInput.value = data.geminiKey;
-        if (data.groqKey && groqKeyInput) groqKeyInput.value = data.groqKey;
-        if (data.huggingfaceKey && huggingfaceKeyInput) huggingfaceKeyInput.value = data.huggingfaceKey;
-        if (data.openaiKey && openaiKeyInput) openaiKeyInput.value = data.openaiKey;
-        if (data.anthropicKey && anthropicKeyInput) anthropicKeyInput.value = data.anthropicKey;
-        if (data.openrouterKey && openrouterKeyInput) openrouterKeyInput.value = data.openrouterKey;
+        // 1. API Keys
+        if (data.geminiKey !== undefined && geminiKeyInput) geminiKeyInput.value = data.geminiKey;
+        if (data.groqKey !== undefined && groqKeyInput) groqKeyInput.value = data.groqKey;
+        if (data.huggingfaceKey !== undefined && huggingfaceKeyInput) huggingfaceKeyInput.value = data.huggingfaceKey;
+        if (data.openaiKey !== undefined && openaiKeyInput) openaiKeyInput.value = data.openaiKey;
+        if (data.anthropicKey !== undefined && anthropicKeyInput) anthropicKeyInput.value = data.anthropicKey;
+        if (data.openrouterKey !== undefined && openrouterKeyInput) openrouterKeyInput.value = data.openrouterKey;
 
-        // Auto-migrate legacy/deprecated models from storage
+        // 2. Auto-migrate legacy/deprecated models from storage
         const legacyMigrations = {
           'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
           'Qwen/Qwen2.5-7B-Instruct': 'meta-llama/Llama-3.1-8B-Instruct',
@@ -384,11 +796,11 @@
           });
         }
 
-        if (migratedStorage && chrome.storage && chrome.storage.sync) {
-          chrome.storage.sync.set(migrationUpdates);
+        if (migratedStorage) {
+          unifiedStorageSet(migrationUpdates);
         }
 
-        // Restore provider-specific models in Keys tab
+        // 3. Restore provider-specific models in Keys tab
         ['gemini', 'groq', 'huggingface', 'openai', 'anthropic', 'openrouter'].forEach(p => {
           const selectEl = document.getElementById(`${p}-model-select`);
           const customEl = document.getElementById(`${p}-custom-model`);
@@ -410,7 +822,7 @@
           }
         });
 
-        // Load models catalog from storage or catalog file
+        // 4. Load models catalog from storage or catalog file
         await initModelCatalog(data.selectedModel || 'gemini:gemini-3.8-flash');
 
         if (data.customProvider && customProviderSelect) {
@@ -426,6 +838,7 @@
           if (customModelContainer) customModelContainer.style.display = 'none';
         }
 
+        // 5. Persona
         if (data.customPersonaPrompt && customInput) {
           customInput.value = data.customPersonaPrompt;
         }
@@ -442,6 +855,77 @@
           if (selectedPersona === 'custom' && customContainer) {
             customContainer.style.display = 'block';
           }
+        }
+        updateScheduleRulesState(selectedPersona);
+
+        // 6. Form URL & Auto Next
+        if (popupFormUrlInput && data.formmind_form_url !== undefined) {
+          popupFormUrlInput.value = data.formmind_form_url;
+        }
+        if (chkAutoAdvance) {
+          chkAutoAdvance.checked = !!data.formmind_auto_next;
+        }
+
+        // 7. Schedule Cooldown Config
+        const cfg = data.formmind_cooldown_config;
+        if (cfg) {
+          if (chkCooldownEnabled) chkCooldownEnabled.checked = !!cfg.enabled;
+          if (cooldownMinInput && cfg.min !== undefined) cooldownMinInput.value = cfg.min;
+          if (cooldownMaxInput && cfg.max !== undefined) cooldownMaxInput.value = cfg.max;
+          if (cooldownUnitSelect && cfg.unit) cooldownUnitSelect.value = cfg.unit;
+          if (chkCooldownAutoSubmit) chkCooldownAutoSubmit.checked = !!cfg.autoSubmit;
+          if (chkCooldownAutoRestart) chkCooldownAutoRestart.checked = cfg.autoRestartFill !== false;
+          if (typeof globalUpdateCooldownHint === 'function') globalUpdateCooldownHint();
+        }
+
+        // 8. Weighted Rules
+        if (data.formmind_weighted_rules && Array.isArray(data.formmind_weighted_rules)) {
+          currentWeightedRules = data.formmind_weighted_rules;
+        }
+        if (typeof globalRenderRules === 'function') {
+          globalRenderRules();
+        }
+
+        // 9. Text Rules
+        if (data.formmind_text_rules && Array.isArray(data.formmind_text_rules)) {
+          currentTextRules = data.formmind_text_rules;
+        }
+        if (typeof globalRenderTextRules === 'function') {
+          globalRenderTextRules();
+        }
+
+        // 10. Global Text Default
+        if (data.formmind_text_global_default) {
+          globalTextConfig = data.formmind_text_global_default;
+          const targetRadio = document.querySelector(`input[name="global-text-mode"][value="${globalTextConfig.mode}"]`);
+          if (targetRadio) targetRadio.checked = true;
+          if (globalFixedInput && globalTextConfig.fixedValue !== undefined) globalFixedInput.value = globalTextConfig.fixedValue;
+          if (globalListTextarea && globalTextConfig.listValues) {
+            globalListTextarea.value = Array.isArray(globalTextConfig.listValues) ? globalTextConfig.listValues.join('\n') : globalTextConfig.listValues;
+          }
+          if (typeof globalUpdateGlobalModeUI === 'function') globalUpdateGlobalModeUI();
+        }
+
+        // 11. Personal Profile Config
+        if (data.formmind_profile_config) {
+          currentProfileConfig = data.formmind_profile_config;
+          const targetRadio = document.querySelector(`input[name="profile-mode"][value="${currentProfileConfig.mode}"]`);
+          if (targetRadio) targetRadio.checked = true;
+          if (profileCustomTextarea && currentProfileConfig.customText !== undefined) {
+            profileCustomTextarea.value = currentProfileConfig.customText;
+          }
+          if (profileCustomContainer) {
+            profileCustomContainer.style.display = currentProfileConfig.mode === 'fake' ? 'block' : 'none';
+          }
+        }
+
+        if (typeof globalUpdateScheduleCooldown === 'function') {
+          globalUpdateScheduleCooldown(data.formmind_cooldown_state);
+        }
+
+        // 11. Last Active Tab Restoration
+        if (data.lastActiveTab) {
+          switchTab(data.lastActiveTab);
         }
 
         updateApiBadge();
@@ -634,10 +1118,15 @@
                   chrome.tabs.sendMessage(tab.id, { action: 'GET_FORM_INFO' }, (retryRes) => {
                     if (retryRes && retryRes.success) {
                       formQuestions = retryRes.questions || [];
+                      hasFormNextPage = !!retryRes.hasNextPage;
                       if (statusDot) statusDot.className = 'status-indicator-dot online';
-                      if (statusLabel) statusLabel.textContent = `Google Form Ready (${retryRes.questionCount} questions)`;
+                      if (statusLabel) {
+                        statusLabel.textContent = retryRes.isIntroPage
+                          ? 'Trang giới thiệu (Bấm Tự động điền để bắt đầu)'
+                          : `Google Form Ready (${retryRes.questionCount} questions)`;
+                      }
                       if (formNameEl) formNameEl.textContent = retryRes.title || tab.title;
-                      if (btnFill) btnFill.disabled = isFillInProgress || formQuestions.length === 0;
+                      if (btnFill) btnFill.disabled = isFillInProgress || (formQuestions.length === 0 && !retryRes.hasNextPage && !retryRes.hasSubmit);
                       renderQuestionsInspection(formQuestions);
                       return;
                     }
@@ -655,11 +1144,16 @@
           }
 
           formQuestions = response.questions || [];
+          hasFormNextPage = !!response.hasNextPage;
           if (statusDot) statusDot.className = 'status-indicator-dot online';
-          if (statusLabel) statusLabel.textContent = `Google Form Ready (${response.questionCount} questions)`;
+          if (statusLabel) {
+            statusLabel.textContent = response.isIntroPage
+              ? 'Trang giới thiệu (Bấm Tự động điền để bắt đầu)'
+              : `Google Form Ready (${response.questionCount} questions)`;
+          }
           if (formNameEl) formNameEl.textContent = response.title || tab.title;
 
-          if (btnFill) btnFill.disabled = isFillInProgress || formQuestions.length === 0;
+          if (btnFill) btnFill.disabled = isFillInProgress || (formQuestions.length === 0 && !response.hasNextPage && !response.hasSubmit);
 
           renderQuestionsInspection(formQuestions);
         });
@@ -757,7 +1251,7 @@
         }
       });
 
-      // Auto-save API keys immediately when typing, pasting, or blurring so in-page floating button always has keys
+      // Auto-save API keys with debounce so keystrokes never exceed Chrome storage quota
       const keyInputs = [
         { el: geminiKeyInput, key: 'geminiKey' },
         { el: groqKeyInput, key: 'groqKey' },
@@ -769,48 +1263,29 @@
 
       keyInputs.forEach(({ el, key }) => {
         if (!el) return;
-        const autoPersist = () => {
-          const val = el.value.trim();
-          chrome.storage.sync.set({ [key]: val }, () => {
+        let persistDebounce = null;
+        const autoPersist = (immediate = false) => {
+          clearTimeout(persistDebounce);
+          const saveNow = () => {
+            const val = el.value.trim();
+            unifiedStorageSet({ [key]: val });
             updateApiBadge();
-          });
+          };
+          if (immediate) {
+            saveNow();
+          } else {
+            persistDebounce = setTimeout(saveNow, 300);
+          }
         };
-        el.addEventListener('input', autoPersist);
-        el.addEventListener('change', autoPersist);
-        el.addEventListener('blur', autoPersist);
+        el.addEventListener('input', () => autoPersist(false));
+        el.addEventListener('change', () => autoPersist(true));
+        el.addEventListener('blur', () => autoPersist(true));
       });
 
       if (btnSaveSettings) {
-        btnSaveSettings.addEventListener('click', () => {
-          const settings = {
-            geminiKey: geminiKeyInput ? geminiKeyInput.value.trim() : '',
-            groqKey: groqKeyInput ? groqKeyInput.value.trim() : '',
-            huggingfaceKey: huggingfaceKeyInput ? huggingfaceKeyInput.value.trim() : '',
-            openaiKey: openaiKeyInput ? openaiKeyInput.value.trim() : '',
-            anthropicKey: anthropicKeyInput ? anthropicKeyInput.value.trim() : '',
-            openrouterKey: openrouterKeyInput ? openrouterKeyInput.value.trim() : '',
-
-            geminiModel: getChosenModelForProvider('gemini'),
-            geminiCustomModel: document.getElementById('gemini-custom-model')?.value.trim() || '',
-            groqModel: getChosenModelForProvider('groq'),
-            groqCustomModel: document.getElementById('groq-custom-model')?.value.trim() || '',
-            huggingfaceModel: getChosenModelForProvider('huggingface'),
-            huggingfaceCustomModel: document.getElementById('huggingface-custom-model')?.value.trim() || '',
-            openaiModel: getChosenModelForProvider('openai'),
-            openaiCustomModel: document.getElementById('openai-custom-model')?.value.trim() || '',
-            anthropicModel: getChosenModelForProvider('anthropic'),
-            anthropicCustomModel: document.getElementById('anthropic-custom-model')?.value.trim() || '',
-            openrouterModel: getChosenModelForProvider('openrouter'),
-            openrouterCustomModel: document.getElementById('openrouter-custom-model')?.value.trim() || ''
-          };
-
-          chrome.storage.sync.set(settings, () => {
-            updateApiBadge();
-            btnSaveSettings.innerHTML = '<span>✅ Settings Saved!</span>';
-            setTimeout(() => {
-              btnSaveSettings.innerHTML = '<span>💾 Save All Settings</span>';
-            }, 2000);
-          });
+        btnSaveSettings.addEventListener('click', async () => {
+          const feedbackEl = settingsFeedback || document.getElementById('settings-feedback') || scheduleFeedback;
+          await saveAllExtensionData(btnSaveSettings, feedbackEl);
         });
       }
 
@@ -856,10 +1331,10 @@
                   feedbackEl.className = 'field-feedback success';
                   feedbackEl.textContent = `✅ ${res.data?.message || 'Verified working!'}`;
                   // Auto-save key & model upon successful test verification!
-                  chrome.storage.sync.set({
+                  unifiedStorageSet({
                     [`${provider}Key`]: key,
                     [`${provider}Model`]: chosenModel
-                  }, () => {
+                  }).then(() => {
                     updateApiBadge();
                   });
                 } else {
@@ -950,11 +1425,9 @@
         }
       }
 
-      if (chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({
-          [`${provider}Model`]: modelId
-        });
-      }
+      unifiedStorageSet({
+        [`${provider}Model`]: modelId
+      });
     }
 
     function syncKeysToFill(provider) {
@@ -977,14 +1450,12 @@
       }
 
       // 2. Persist to storage
-      if (chrome.storage && chrome.storage.sync) {
-        chrome.storage.sync.set({
-          selectedModel: modelSelect.value,
-          [`${provider}Model`]: chosenModel,
-          customProvider: provider,
-          customModelName: chosenModel
-        });
-      }
+      unifiedStorageSet({
+        selectedModel: modelSelect.value,
+        [`${provider}Model`]: chosenModel,
+        customProvider: provider,
+        customModelName: chosenModel
+      });
 
       // 3. Update badges & descriptions
       updateApiBadge();
@@ -1045,7 +1516,7 @@
         }
         modelName = (modelName || '').replace(/^((gemini|groq|huggingface|openai|anthropic|openrouter|custom):+)+/i, '').replace(/^models\//i, '').trim();
 
-        const storageKeys = await chrome.storage.sync.get([
+        const storageKeys = await unifiedStorageGet([
           'geminiKey',
           'groqKey',
           'huggingfaceKey',
@@ -1173,25 +1644,9 @@
      * Setup Form URL and Auto Next checkbox with two-way sync
      */
     function setupFormUrlAndAutoNext() {
-      const popupFormUrlInput = document.getElementById('popup-form-url');
-      const btnGetCurrentUrl = document.getElementById('btn-get-current-url');
-      const chkAutoAdvance = document.getElementById('chk-auto-advance');
-
-      if (chrome?.storage?.local) {
-        chrome.storage.local.get(['formmind_form_url', 'formmind_auto_next'], (res) => {
-          if (popupFormUrlInput && res?.formmind_form_url) {
-            popupFormUrlInput.value = res.formmind_form_url;
-          }
-          if (chkAutoAdvance) {
-            // Default is OFF (unchecked) per specifications
-            chkAutoAdvance.checked = !!(res && res.formmind_auto_next);
-          }
-        });
-      }
-
       if (chkAutoAdvance) {
         chkAutoAdvance.addEventListener('change', () => {
-          chrome.storage.local.set({ formmind_auto_next: chkAutoAdvance.checked });
+          unifiedStorageSet({ formmind_auto_next: chkAutoAdvance.checked });
         });
       }
 
@@ -1200,11 +1655,11 @@
         popupFormUrlInput.addEventListener('input', () => {
           clearTimeout(urlDebounce);
           urlDebounce = setTimeout(() => {
-            chrome.storage.local.set({ formmind_form_url: popupFormUrlInput.value.trim() });
-          }, 350);
+            unifiedStorageSet({ formmind_form_url: popupFormUrlInput.value.trim() });
+          }, 300);
         });
         popupFormUrlInput.addEventListener('blur', () => {
-          chrome.storage.local.set({ formmind_form_url: popupFormUrlInput.value.trim() });
+          unifiedStorageSet({ formmind_form_url: popupFormUrlInput.value.trim() });
         });
       }
 
@@ -1214,7 +1669,7 @@
             if (tabs && tabs[0] && tabs[0].url) {
               const tabUrl = tabs[0].url;
               if (popupFormUrlInput) popupFormUrlInput.value = tabUrl;
-              chrome.storage.local.set({ formmind_form_url: tabUrl });
+              unifiedStorageSet({ formmind_form_url: tabUrl });
               btnGetCurrentUrl.innerHTML = '<span>✅ Đã lấy!</span>';
               setTimeout(() => {
                 btnGetCurrentUrl.innerHTML = '<span>🎯 Lấy URL tab này</span>';
@@ -1225,34 +1680,11 @@
       }
     }
 
-    let globalUpdateScheduleCooldown = null;
-    let globalUpdateWeightedRules = null;
 
     /**
      * Setup Schedule Tab: Module A (Cooldown) and Module B (Weighted Rules)
      */
     function setupScheduleTab() {
-      const popupCooldownBanner = document.getElementById('popup-cooldown-banner');
-      const popupCooldownTimer = document.getElementById('popup-cooldown-timer');
-      const btnPopupSkipCooldown = document.getElementById('btn-popup-skip-cooldown');
-      const btnPopupCancelCooldown = document.getElementById('btn-popup-cancel-cooldown');
-      const chkCooldownEnabled = document.getElementById('chk-cooldown-enabled');
-      const cooldownMinInput = document.getElementById('cooldown-min-val');
-      const cooldownMaxInput = document.getElementById('cooldown-max-val');
-      const cooldownUnitSelect = document.getElementById('cooldown-unit-select');
-      const chkCooldownAutoSubmit = document.getElementById('chk-cooldown-auto-submit');
-      const chkCooldownAutoRestart = document.getElementById('chk-cooldown-auto-restart');
-      const cooldownPreviewHint = document.getElementById('cooldown-preview-hint');
-
-      const btnAddWeightedRule = document.getElementById('btn-add-weighted-rule');
-      const btnBatchRandomizeRules = document.getElementById('btn-batch-randomize-rules');
-      const btnImportFormRules = document.getElementById('btn-import-form-rules');
-      const weightedRulesContainer = document.getElementById('weighted-rules-container');
-      const rulesEmptyState = document.getElementById('rules-empty-state');
-      const btnSaveSchedule = document.getElementById('btn-save-schedule');
-      const scheduleFeedback = document.getElementById('schedule-feedback');
-
-      let currentWeightedRules = [];
       let popupCooldownInterval = null;
 
       /**
@@ -1297,13 +1729,49 @@
 
       /**
        * Auto-import detected choice-based questions from active form into currentWeightedRules
+       * Queries EXTRACT_ALL_FORM_QUESTIONS to load 100% of questions across all pages from FB_PUBLIC_LOAD_DATA_
        */
-      function importRulesFromFormQuestions() {
-        if (!formQuestions || formQuestions.length === 0) {
+      async function importRulesFromFormQuestions() {
+        let questionsToImport = [];
+
+        // 1. Thử gửi message tới content script để lấy 100% câu hỏi từ FB_PUBLIC_LOAD_DATA_
+        try {
+          let tabId = currentTab?.id;
+          if (!tabId && typeof chrome !== 'undefined' && chrome.tabs?.query) {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0]?.id) tabId = tabs[0].id;
+          }
+
+          if (tabId && typeof chrome !== 'undefined' && chrome.tabs?.sendMessage) {
+            const resp = await new Promise(resolve => {
+              try {
+                chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_ALL_FORM_QUESTIONS' }, (r) => {
+                  if (chrome.runtime?.lastError || !r) resolve(null);
+                  else resolve(r);
+                });
+              } catch (err) {
+                resolve(null);
+              }
+            });
+            if (resp && resp.success && Array.isArray(resp.questions) && resp.questions.length > 0) {
+              questionsToImport = resp.questions;
+            }
+          }
+        } catch (e) {
+          console.warn('[FormMind] Error querying content script for full questions:', e);
+        }
+
+        // 2. Fallback nếu content script chưa tải: Dùng formQuestions có sẵn
+        if (questionsToImport.length === 0 && Array.isArray(formQuestions) && formQuestions.length > 0) {
+          questionsToImport = formQuestions;
+        }
+
+        if (questionsToImport.length === 0) {
           return false;
         }
 
-        const eligible = formQuestions.filter(q => {
+        // Lọc chỉ lấy các câu hỏi dạng lựa chọn (radio, checkbox, dropdown, scale)
+        const eligible = questionsToImport.filter(q => {
           return (q.options && q.options.length > 1) || q.type === 'scale' || q.type === 'radio' || q.type === 'checkbox' || q.type === 'dropdown';
         });
 
@@ -1311,7 +1779,8 @@
           return false;
         }
 
-        const imported = eligible.map((q, idx) => {
+        // Tạo các Rule tương ứng với matchType là 'title' để khớp xuyên suốt mọi trang
+        currentWeightedRules = eligible.map((q, idx) => {
           let opts = [];
           if (q.options && q.options.length > 0) {
             opts = q.options.map(optLabel => ({ label: optLabel, weight: 0 }));
@@ -1329,18 +1798,18 @@
             ];
           }
 
-          const qOrder = q.id !== undefined && !isNaN(parseInt(q.id, 10)) ? (parseInt(q.id, 10) + 1) : (idx + 1);
+          const qTitle = (q.title || '').trim();
 
           return {
-            id: 'rule_q_' + qOrder + '_' + Date.now(),
-            matchType: 'index',
-            matchValue: String(qOrder),
-            titleHint: q.title || `Câu hỏi ${qOrder}`,
+            id: 'rule_q_' + (idx + 1) + '_' + Date.now(),
+            matchType: 'title',
+            matchValue: qTitle,
+            titleHint: qTitle || `Câu hỏi ${idx + 1}`,
+            type: q.type || 'radio',
             options: opts
           };
         });
 
-        currentWeightedRules = imported;
         return true;
       }
 
@@ -1382,10 +1851,33 @@
       globalUpdateScheduleCooldown = checkAndRenderCooldownBanner;
 
       if (btnPopupSkipCooldown) {
-        btnPopupSkipCooldown.addEventListener('click', () => {
-          chrome.runtime.sendMessage({ action: 'SKIP_COOLDOWN' });
+        btnPopupSkipCooldown.addEventListener('click', async () => {
           if (popupCooldownBanner) popupCooldownBanner.style.display = 'none';
           if (popupCooldownInterval) clearInterval(popupCooldownInterval);
+          try {
+            await chrome.storage.local.set({
+              formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 },
+              formmind_auto_start_next_run: true,
+              isRunning: true,
+              retryCount: 0,
+              formmind_retry_count: 0
+            });
+          } catch (e) {}
+          chrome.runtime.sendMessage({ action: 'SKIP_COOLDOWN' });
+
+          // Also redirect current active tab if it is on Google Forms /formResponse
+          try {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+              if (tabs && tabs[0] && tabs[0].id) {
+                const url = tabs[0].url || '';
+                if (url.includes('/formResponse')) {
+                  chrome.tabs.update(tabs[0].id, { url: url.replace(/\/formResponse.*/i, '/viewform') });
+                } else if (url.includes('docs.google.com/forms')) {
+                  chrome.tabs.reload(tabs[0].id);
+                }
+              }
+            });
+          } catch (e) {}
         });
       }
 
@@ -1397,9 +1889,20 @@
         });
       }
 
+      function updateRulesCountBadge() {
+        if (!rulesCountBadge) return;
+        if (currentWeightedRules && currentWeightedRules.length > 0) {
+          rulesCountBadge.style.display = 'inline-block';
+          rulesCountBadge.textContent = `${currentWeightedRules.length} câu hỏi (Đa trang)`;
+        } else {
+          rulesCountBadge.style.display = 'none';
+        }
+      }
+
       function renderRules() {
         if (!weightedRulesContainer) return;
         weightedRulesContainer.innerHTML = '';
+        updateRulesCountBadge();
 
         if (!currentWeightedRules || currentWeightedRules.length === 0) {
           if (rulesEmptyState) rulesEmptyState.style.display = 'block';
@@ -1412,12 +1915,13 @@
           card.className = 'rule-card';
           card.dataset.ruleIdx = rIdx;
 
+          const isCheckbox = rule.type === 'checkbox';
           const totalWeight = (rule.options || []).reduce((s, o) => s + (parseFloat(o.weight) || 0), 0);
           const isValid100 = Math.abs(totalWeight - 100) < 0.1;
           const isIndexMatch = rule.matchType === 'index';
           const ruleLabel = isIndexMatch
             ? `Câu ${rule.matchValue || (rIdx + 1)}`
-            : `Quy tắc #${rIdx + 1}`;
+            : `Câu #${rIdx + 1} (Tiêu đề)`;
           const titleHintHtml = rule.titleHint
             ? `<span class="rule-title-hint" title="${escapeHtml(rule.titleHint)}">${escapeHtml(rule.titleHint)}</span>`
             : '';
@@ -1426,6 +1930,7 @@
             <div class="rule-card-header">
               <div class="rule-badge-group">
                 <span class="rule-badge">${escapeHtml(ruleLabel)}</span>
+                <span class="rule-type-badge ${isCheckbox ? 'checkbox' : 'radio'}">${isCheckbox ? '☑️ Checkbox' : '🔘 Chọn 1'}</span>
                 ${titleHintHtml}
               </div>
               <button type="button" class="btn-delete-rule" data-action="delete-rule" data-rule-idx="${rIdx}" title="Xóa quy tắc này">✕</button>
@@ -1438,14 +1943,24 @@
               <input type="text" class="rule-match-input" data-action="change-match-val" data-rule-idx="${rIdx}"
                 value="${escapeHtml(rule.matchValue || '')}"
                 placeholder="${isIndexMatch ? 'Số câu (vd: 1, 2, 3...)' : 'Từ khóa (vd: giới tính, độ tuổi, hài lòng...)'}">
+              <select class="rule-type-select" data-action="change-rule-type" data-rule-idx="${rIdx}" title="Loại câu hỏi (Chọn 1 hoặc Checkbox)">
+                <option value="radio" ${!isCheckbox ? 'selected' : ''}>🔘 Chọn 1 (100%)</option>
+                <option value="checkbox" ${isCheckbox ? 'selected' : ''}>☑️ Checkbox (Độc lập)</option>
+              </select>
             </div>
             <div class="rule-options-container" id="rule-opts-${rIdx}"></div>
             <button type="button" class="btn-add-opt" data-action="add-option" data-rule-idx="${rIdx}">+ Thêm lựa chọn</button>
             <div class="rule-footer-bar">
-              <span class="rule-total-status ${isValid100 ? 'valid' : 'invalid'}">
-                ${isValid100 ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(totalWeight)}% (chưa bằng 100%)`}
-              </span>
-              ${!isValid100 ? `<button type="button" class="btn-normalize-100" data-action="normalize-100" data-rule-idx="${rIdx}">⚖️ Tự cân bằng 100%</button>` : ''}
+              ${isCheckbox ? `
+                <span class="rule-total-status valid">
+                  ☑️ Tỉ lệ độc lập từng ô - Tổng: ${Math.round(totalWeight)}%
+                </span>
+              ` : `
+                <span class="rule-total-status ${isValid100 ? 'valid' : 'invalid'}">
+                  ${isValid100 ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(totalWeight)}% (chưa bằng 100%)`}
+                </span>
+                ${!isValid100 ? `<button type="button" class="btn-normalize-100" data-action="normalize-100" data-rule-idx="${rIdx}">⚖️ Tự cân bằng 100%</button>` : ''}
+              `}
             </div>
           `;
 
@@ -1466,6 +1981,8 @@
 
           weightedRulesContainer.appendChild(card);
         });
+
+        updateScheduleRulesState(selectedPersona);
       }
 
       globalUpdateWeightedRules = (newRules) => {
@@ -1474,19 +1991,20 @@
       };
 
       /**
-       * 1-Click Batch Randomize Distribution Handler
+       * 1-Click Batch Randomize Distribution Handler (Lazy Mode)
        */
-      function handleBatchRandomize() {
-        // If empty, auto-import from formQuestions or fallback to default sample questions
+      async function handleBatchRandomize() {
+        // If empty, auto-import from 100% form questions (Lazy Mode) or fallback to default sample questions
         if (!currentWeightedRules || currentWeightedRules.length === 0) {
-          const imported = importRulesFromFormQuestions();
+          const imported = await importRulesFromFormQuestions();
           if (!imported) {
             currentWeightedRules = [
               {
                 id: 'rule_1',
-                matchType: 'index',
-                matchValue: '1',
+                matchType: 'title',
+                matchValue: 'Ví dụ: Đánh giá chất lượng dịch vụ',
                 titleHint: 'Ví dụ: Đánh giá chất lượng dịch vụ',
+                type: 'radio',
                 options: [
                   { label: 'Rất hài lòng', weight: 0 },
                   { label: 'Hài lòng', weight: 0 },
@@ -1496,9 +2014,10 @@
               },
               {
                 id: 'rule_2',
-                matchType: 'index',
-                matchValue: '2',
+                matchType: 'title',
+                matchValue: 'Ví dụ: Bạn có muốn giới thiệu bạn bè không?',
                 titleHint: 'Ví dụ: Bạn có muốn giới thiệu bạn bè không?',
+                type: 'radio',
                 options: [
                   { label: 'Có', weight: 0 },
                   { label: 'Không', weight: 0 }
@@ -1506,9 +2025,10 @@
               },
               {
                 id: 'rule_3',
-                matchType: 'index',
-                matchValue: '3',
+                matchType: 'title',
+                matchValue: 'Ví dụ: Độ tuổi của bạn',
                 titleHint: 'Ví dụ: Độ tuổi của bạn',
+                type: 'radio',
                 options: [
                   { label: 'Dưới 18', weight: 0 },
                   { label: '18 - 25', weight: 0 },
@@ -1517,7 +2037,6 @@
               }
             ];
           }
-          renderRules();
         }
 
         // Animate dice spin
@@ -1529,54 +2048,45 @@
           }, 450);
         }
 
-        // Batch distribute independent percentages for each question
-        const ruleCards = weightedRulesContainer?.querySelectorAll('.rule-card') || [];
-
-        currentWeightedRules.forEach((rule, rIdx) => {
+        // Batch distribute percentages for each question
+        currentWeightedRules.forEach((rule) => {
           const opts = rule.options || [];
           if (opts.length === 0) return;
 
-          // Generate independent random percentage distribution summing to exactly 100%
-          const pcts = generatePercentages(opts.length);
-
-          // Update model
-          opts.forEach((o, oIdx) => {
-            o.weight = pcts[oIdx];
-          });
-
-          // In-place DOM update with input event dispatching for reactivity
-          const card = ruleCards[rIdx];
-          if (card) {
-            const weightInputs = card.querySelectorAll('.rule-weight-input');
-            weightInputs.forEach((input, oIdx) => {
-              if (pcts[oIdx] !== undefined) {
-                input.value = pcts[oIdx];
-                input.classList.remove('flashing');
-                void input.offsetWidth; // Trigger reflow for CSS animation
-                input.classList.add('flashing');
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-              }
+          if (rule.type === 'checkbox') {
+            // Checkbox: Independent probability for each option (30% to 75%), does NOT sum to 100%
+            const steps = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75];
+            opts.forEach((o) => {
+              o.weight = steps[Math.floor(Math.random() * steps.length)];
             });
-
-            const statusEl = card.querySelector('.rule-total-status');
-            if (statusEl) {
-              statusEl.className = 'rule-total-status valid';
-              statusEl.textContent = '✅ Tổng: 100%';
-            }
-
-            const normBtn = card.querySelector('.btn-normalize-100');
-            if (normBtn) normBtn.remove();
+          } else {
+            // Single choice (radio/scale/dropdown): Sum = 100%
+            const pcts = generatePercentages(opts.length);
+            opts.forEach((o, oIdx) => {
+              o.weight = pcts[oIdx];
+            });
           }
+        });
+
+        // Always re-render all cards to display updated distribution and badges
+        renderRules();
+
+        // Flash inputs for visual confirmation
+        const inputs = weightedRulesContainer?.querySelectorAll('.rule-weight-input') || [];
+        inputs.forEach(input => {
+          input.classList.remove('flashing');
+          void input.offsetWidth;
+          input.classList.add('flashing');
         });
 
         if (scheduleFeedback) {
           scheduleFeedback.className = 'field-feedback success';
-          scheduleFeedback.textContent = `🎲 Đã tự động phân bổ ngẫu nhiên tỉ lệ 100% cho tất cả ${currentWeightedRules.length} câu hỏi! Bấm "Lưu cấu hình" để áp dụng.`;
+          scheduleFeedback.textContent = `🎲 Đã tự động phân bổ ngẫu nhiên tỉ lệ cho tất cả ${currentWeightedRules.length} câu hỏi (Độc lập cho Checkbox, 100% cho Chọn 1)! Bấm "Lưu cấu hình" để áp dụng.`;
           setTimeout(() => {
             if (scheduleFeedback && scheduleFeedback.textContent.includes('🎲')) {
               scheduleFeedback.textContent = '';
             }
-          }, 4000);
+          }, 4500);
         }
       }
 
@@ -1585,21 +2095,30 @@
       }
 
       if (btnImportFormRules) {
-        btnImportFormRules.addEventListener('click', () => {
-          const ok = importRulesFromFormQuestions();
-          if (ok) {
-            renderRules();
-            if (scheduleFeedback) {
-              scheduleFeedback.className = 'field-feedback success';
-              scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentWeightedRules.length} câu hỏi từ Google Form! Bấm "🎲 Random tất cả tỉ lệ" để phân bổ.`;
-              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+        btnImportFormRules.addEventListener('click', async () => {
+          const originalHtml = btnImportFormRules.innerHTML;
+          btnImportFormRules.disabled = true;
+          btnImportFormRules.innerHTML = '<span>⏳ Đang quét...</span>';
+
+          try {
+            const ok = await importRulesFromFormQuestions();
+            if (ok) {
+              renderRules();
+              if (scheduleFeedback) {
+                scheduleFeedback.className = 'field-feedback success';
+                scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentWeightedRules.length} câu hỏi từ tất cả các trang! Bấm "🎲 Random tất cả tỉ lệ" để phân bổ.`;
+                setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 4500);
+              }
+            } else {
+              if (scheduleFeedback) {
+                scheduleFeedback.className = 'field-feedback error';
+                scheduleFeedback.textContent = '⚠️ Chưa tìm thấy câu hỏi nào trong form. Vui lòng mở trang Google Form.';
+                setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+              }
             }
-          } else {
-            if (scheduleFeedback) {
-              scheduleFeedback.className = 'field-feedback error';
-              scheduleFeedback.textContent = '⚠️ Chưa tìm thấy câu hỏi nào trong form. Vui lòng mở trang Google Form.';
-              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
-            }
+          } finally {
+            btnImportFormRules.disabled = false;
+            btnImportFormRules.innerHTML = originalHtml;
           }
         });
       }
@@ -1622,12 +2141,18 @@
               currentWeightedRules[rIdx].options[oIdx].weight = parseFloat(e.target.value) || 0;
               const card = e.target.closest('.rule-card');
               if (card) {
+                const isCheckbox = currentWeightedRules[rIdx].type === 'checkbox';
                 const total = (currentWeightedRules[rIdx].options || []).reduce((s, o) => s + (parseFloat(o.weight) || 0), 0);
-                const valid = Math.abs(total - 100) < 0.1;
                 const statusEl = card.querySelector('.rule-total-status');
                 if (statusEl) {
-                  statusEl.className = `rule-total-status ${valid ? 'valid' : 'invalid'}`;
-                  statusEl.textContent = valid ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(total)}% (chưa bằng 100%)`;
+                  if (isCheckbox) {
+                    statusEl.className = 'rule-total-status valid';
+                    statusEl.textContent = `☑️ Tỉ lệ độc lập từng ô - Tổng: ${Math.round(total)}%`;
+                  } else {
+                    const valid = Math.abs(total - 100) < 0.1;
+                    statusEl.className = `rule-total-status ${valid ? 'valid' : 'invalid'}`;
+                    statusEl.textContent = valid ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(total)}% (chưa bằng 100%)`;
+                  }
                 }
               }
             }
@@ -1641,6 +2166,9 @@
 
           if (action === 'change-match-type') {
             currentWeightedRules[rIdx].matchType = e.target.value;
+            renderRules();
+          } else if (action === 'change-rule-type') {
+            currentWeightedRules[rIdx].type = e.target.value;
             renderRules();
           }
         });
@@ -1703,30 +2231,6 @@
       }
 
       // --- Module C: Text & Essay Input Question Rules ---
-      const textRulesContainer = document.getElementById('text-rules-container');
-      const textRulesEmptyState = document.getElementById('text-rules-empty-state');
-      const btnAddTextRule = document.getElementById('btn-add-text-rule');
-      const btnImportFormTextRules = document.getElementById('btn-import-form-text-rules');
-      const btnApplyAllTextMode = document.getElementById('btn-apply-all-text-mode');
-      const globalFixedInput = document.getElementById('global-fixed-input');
-      const globalListTextarea = document.getElementById('global-list-textarea');
-      const globalFixedContainer = document.getElementById('global-fixed-container');
-      const globalListContainer = document.getElementById('global-list-container');
-      const globalModeRadios = document.querySelectorAll('input[name="global-text-mode"]');
-
-      let currentTextRules = [];
-      let globalTextConfig = {
-        type: 'text',
-        mode: 'fixed',
-        fixedValue: 'Không có ý kiến gì thêm',
-        listValues: [
-          'Dịch vụ rất tốt, nhân viên nhiệt tình',
-          'Sản phẩm dùng ổn trong tầm giá',
-          'Cần cải thiện tốc độ giao hàng',
-          'Rất hài lòng với trải nghiệm lần này'
-        ]
-      };
-
       function updateGlobalModeUI() {
         const selectedRadio = document.querySelector('input[name="global-text-mode"]:checked');
         const mode = selectedRadio ? selectedRadio.value : 'fixed';
@@ -1884,21 +2388,53 @@
         });
       }
 
-      // Import text & textarea questions from active form
-      function importTextRulesFromForm() {
-        if (!formQuestions || formQuestions.length === 0) return false;
+      // Import text & textarea questions from active form across all pages
+      async function importTextRulesFromForm() {
+        let questionsToImport = [];
 
-        const textQuestions = formQuestions.filter(q => q.type === 'text' || q.type === 'textarea');
+        try {
+          let tabId = currentTab?.id;
+          if (!tabId && typeof chrome !== 'undefined' && chrome.tabs?.query) {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tabs && tabs[0]?.id) tabId = tabs[0].id;
+          }
+
+          if (tabId && typeof chrome !== 'undefined' && chrome.tabs?.sendMessage) {
+            const resp = await new Promise(resolve => {
+              try {
+                chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_ALL_FORM_QUESTIONS' }, (r) => {
+                  if (chrome.runtime?.lastError || !r) resolve(null);
+                  else resolve(r);
+                });
+              } catch (err) {
+                resolve(null);
+              }
+            });
+            if (resp && resp.success && Array.isArray(resp.questions) && resp.questions.length > 0) {
+              questionsToImport = resp.questions;
+            }
+          }
+        } catch (e) {
+          console.warn('[FormMind] Error querying content script for text questions:', e);
+        }
+
+        if (questionsToImport.length === 0 && Array.isArray(formQuestions) && formQuestions.length > 0) {
+          questionsToImport = formQuestions;
+        }
+
+        if (questionsToImport.length === 0) return false;
+
+        const textQuestions = questionsToImport.filter(q => q.type === 'text' || q.type === 'textarea');
         if (textQuestions.length === 0) return false;
 
         const imported = textQuestions.map((q, idx) => {
-          const qOrder = q.id !== undefined && !isNaN(parseInt(q.id, 10)) ? (parseInt(q.id, 10) + 1) : (idx + 1);
+          const qTitle = (q.title || '').trim();
           return {
-            id: 'text_q_' + qOrder + '_' + Date.now(),
+            id: 'text_q_' + (idx + 1) + '_' + Date.now(),
             type: 'text',
-            matchType: 'index',
-            matchValue: String(qOrder),
-            titleHint: q.title || `Câu hỏi tự luận ${qOrder}`,
+            matchType: 'title',
+            matchValue: qTitle,
+            titleHint: qTitle || `Câu hỏi tự luận ${idx + 1}`,
             mode: globalTextConfig.mode || 'fixed',
             fixedValue: globalTextConfig.fixedValue || 'Không có ý kiến gì thêm',
             listValues: [...(globalTextConfig.listValues || [])]
@@ -1910,13 +2446,13 @@
       }
 
       if (btnImportFormTextRules) {
-        btnImportFormTextRules.addEventListener('click', () => {
-          const ok = importTextRulesFromForm();
+        btnImportFormTextRules.addEventListener('click', async () => {
+          const ok = await importTextRulesFromForm();
           if (ok) {
             renderTextRules();
             if (scheduleFeedback) {
               scheduleFeedback.className = 'field-feedback success';
-              scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentTextRules.length} câu tự luận từ Google Form!`;
+              scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentTextRules.length} câu tự luận từ tất cả các trang!`;
               setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
             }
           } else {
@@ -1931,7 +2467,7 @@
 
       // Quick apply mode & values to ALL text rules
       if (btnApplyAllTextMode) {
-        btnApplyAllTextMode.addEventListener('click', () => {
+        btnApplyAllTextMode.addEventListener('click', async () => {
           const selectedRadio = document.querySelector('input[name="global-text-mode"]:checked');
           const mode = selectedRadio ? selectedRadio.value : 'fixed';
           const fixedVal = globalFixedInput ? globalFixedInput.value : '';
@@ -1942,14 +2478,14 @@
           globalTextConfig.listValues = listVals;
 
           if (!currentTextRules || currentTextRules.length === 0) {
-            const ok = importTextRulesFromForm();
+            const ok = await importTextRulesFromForm();
             if (!ok) {
               currentTextRules = [
                 {
                   id: 'text_rule_sample',
                   type: 'text',
-                  matchType: 'index',
-                  matchValue: '1',
+                  matchType: 'title',
+                  matchValue: 'Ví dụ: Đóng góp ý kiến',
                   titleHint: 'Ví dụ: Đóng góp ý kiến',
                   mode: mode,
                   fixedValue: fixedVal,
@@ -1967,6 +2503,10 @@
           });
 
           renderTextRules();
+          unifiedStorageSet({
+            formmind_text_rules: currentTextRules,
+            formmind_text_global_default: globalTextConfig
+          });
 
           if (scheduleFeedback) {
             const modeName = mode === 'skip' ? 'Bỏ qua (Skip)' : mode === 'fixed' ? 'Điền cố định' : 'Random theo danh sách';
@@ -1979,97 +2519,60 @@
 
       if (btnSaveSchedule) {
         btnSaveSchedule.addEventListener('click', async () => {
-          const cooldownConfig = {
-            enabled: chkCooldownEnabled ? chkCooldownEnabled.checked : false,
-            min: parseFloat(cooldownMinInput?.value) || 5,
-            max: parseFloat(cooldownMaxInput?.value) || 15,
-            unit: cooldownUnitSelect?.value || 'm',
-            autoSubmit: chkCooldownAutoSubmit ? chkCooldownAutoSubmit.checked : false,
-            autoRestartFill: chkCooldownAutoRestart ? chkCooldownAutoRestart.checked : true
-          };
-
-          await chrome.storage.local.set({
-            formmind_cooldown_config: cooldownConfig,
-            formmind_weighted_rules: currentWeightedRules,
-            formmind_text_rules: currentTextRules,
-            formmind_text_global_default: globalTextConfig
-          });
-
-          if (scheduleFeedback) {
-            scheduleFeedback.className = 'field-feedback success';
-            scheduleFeedback.textContent = '✅ Đã lưu cấu hình Schedule & Rules thành công!';
-            setTimeout(() => {
-              if (scheduleFeedback) scheduleFeedback.textContent = '';
-            }, 3000);
-          }
+          await saveAllExtensionData(btnSaveSchedule, scheduleFeedback);
         });
       }
 
-      if (chrome?.storage?.local) {
-        chrome.storage.local.get([
-          'formmind_cooldown_config',
-          'formmind_cooldown_state',
-          'formmind_weighted_rules',
-          'formmind_text_rules',
-          'formmind_text_global_default'
-        ], (res) => {
-          const cfg = res?.formmind_cooldown_config;
-          if (cfg) {
-            if (chkCooldownEnabled) chkCooldownEnabled.checked = !!cfg.enabled;
-            if (cooldownMinInput && cfg.min) cooldownMinInput.value = cfg.min;
-            if (cooldownMaxInput && cfg.max) cooldownMaxInput.value = cfg.max;
-            if (cooldownUnitSelect && cfg.unit) cooldownUnitSelect.value = cfg.unit;
-            if (chkCooldownAutoSubmit) chkCooldownAutoSubmit.checked = !!cfg.autoSubmit;
-            if (chkCooldownAutoRestart) chkCooldownAutoRestart.checked = cfg.autoRestartFill !== false;
-            updateCooldownHint();
-          }
-
-          if (res?.formmind_weighted_rules) {
-            currentWeightedRules = res.formmind_weighted_rules;
-            renderRules();
-          }
-
-          if (res?.formmind_text_rules) {
-            currentTextRules = res.formmind_text_rules;
-            renderTextRules();
-          }
-
-          if (res?.formmind_text_global_default) {
-            globalTextConfig = res.formmind_text_global_default;
-            const targetRadio = document.querySelector(`input[name="global-text-mode"][value="${globalTextConfig.mode}"]`);
-            if (targetRadio) targetRadio.checked = true;
-            if (globalFixedInput && globalTextConfig.fixedValue) globalFixedInput.value = globalTextConfig.fixedValue;
-            if (globalListTextarea && globalTextConfig.listValues) {
-              globalListTextarea.value = Array.isArray(globalTextConfig.listValues) ? globalTextConfig.listValues.join('\n') : globalTextConfig.listValues;
+      // Profile Mode radio toggle listener
+      if (profileModeRadios && profileModeRadios.length > 0) {
+        profileModeRadios.forEach(radio => {
+          radio.addEventListener('change', () => {
+            if (profileCustomContainer) {
+              profileCustomContainer.style.display = (radio.value === 'fake') ? 'block' : 'none';
             }
-            updateGlobalModeUI();
-          }
-
-          checkAndRenderCooldownBanner(res?.formmind_cooldown_state);
+          });
         });
       }
+
+      // Expose schedule hooks to global and loadSavedSettings
+      globalRenderRules = renderRules;
+      globalRenderTextRules = renderTextRules;
+      globalUpdateScheduleCooldown = checkAndRenderCooldownBanner;
+      globalUpdateWeightedRules = (newRules) => {
+        currentWeightedRules = newRules;
+        renderRules();
+      };
+      globalUpdateTextRules = (newRules) => {
+        currentTextRules = newRules;
+        renderTextRules();
+      };
+      globalUpdateCooldownHint = updateCooldownHint;
+      globalUpdateGlobalModeUI = updateGlobalModeUI;
     }
 
     // Listen for storage changes from in-page floating widget and background
     if (chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'sync') {
-          if (changes.defaultPersona) {
-            const newPersona = changes.defaultPersona.newValue;
-            if (newPersona && newPersona !== selectedPersona) {
-              selectedPersona = newPersona;
-              personaCards.forEach(card => {
-                if (card.getAttribute('data-persona') === selectedPersona) {
-                  card.classList.add('selected');
-                } else {
-                  card.classList.remove('selected');
-                }
-              });
-              if (customContainer) {
-                customContainer.style.display = selectedPersona === 'custom' ? 'block' : 'none';
+        // Two-way sync: defaultPersona (from either sync or local)
+        if (changes.defaultPersona) {
+          const newPersona = changes.defaultPersona.newValue;
+          if (newPersona && newPersona !== selectedPersona) {
+            selectedPersona = newPersona;
+            personaCards.forEach(card => {
+              if (card.getAttribute('data-persona') === selectedPersona) {
+                card.classList.add('selected');
+              } else {
+                card.classList.remove('selected');
               }
+            });
+            if (customContainer) {
+              customContainer.style.display = selectedPersona === 'custom' ? 'block' : 'none';
             }
+            updateScheduleRulesState(selectedPersona);
           }
+        }
+
+        if (areaName === 'sync') {
           if (changes.selectedModel && modelSelect) {
             const newModel = changes.selectedModel.newValue;
             if (modelSelect.value !== newModel) {
@@ -2105,9 +2608,44 @@
             globalUpdateScheduleCooldown(changes.formmind_cooldown_state.newValue);
           }
 
+          // Cooldown config changes
+          if (changes.formmind_cooldown_config) {
+            const cfg = changes.formmind_cooldown_config.newValue;
+            if (cfg) {
+              if (chkCooldownEnabled) chkCooldownEnabled.checked = !!cfg.enabled;
+              if (cooldownMinInput && cfg.min !== undefined) cooldownMinInput.value = cfg.min;
+              if (cooldownMaxInput && cfg.max !== undefined) cooldownMaxInput.value = cfg.max;
+              if (cooldownUnitSelect && cfg.unit) cooldownUnitSelect.value = cfg.unit;
+              if (chkCooldownAutoSubmit) chkCooldownAutoSubmit.checked = !!cfg.autoSubmit;
+              if (chkCooldownAutoRestart) chkCooldownAutoRestart.checked = cfg.autoRestartFill !== false;
+              if (typeof globalUpdateCooldownHint === 'function') globalUpdateCooldownHint();
+            }
+          }
+
           // Weighted rules changes
           if (changes.formmind_weighted_rules && typeof globalUpdateWeightedRules === 'function') {
             globalUpdateWeightedRules(changes.formmind_weighted_rules.newValue || []);
+          }
+
+          // Text rules changes
+          if (changes.formmind_text_rules && typeof globalUpdateTextRules === 'function') {
+            globalUpdateTextRules(changes.formmind_text_rules.newValue || []);
+          }
+
+          // Profile config changes
+          if (changes.formmind_profile_config) {
+            const newProf = changes.formmind_profile_config.newValue;
+            if (newProf) {
+              currentProfileConfig = newProf;
+              const targetRadio = document.querySelector(`input[name="profile-mode"][value="${newProf.mode}"]`);
+              if (targetRadio) targetRadio.checked = true;
+              if (profileCustomTextarea && newProf.customText !== undefined) {
+                profileCustomTextarea.value = newProf.customText;
+              }
+              if (profileCustomContainer) {
+                profileCustomContainer.style.display = newProf.mode === 'fake' ? 'block' : 'none';
+              }
+            }
           }
 
           if (changes.formmind_active_session) {
@@ -2118,7 +2656,7 @@
               showProgress(newSession.statusMessage || `Đang tự động điền trang ${newSession.pageNumber}...`, true);
             } else {
               isFillInProgress = false;
-              if (btnFill && isGoogleForm && formQuestions.length > 0) {
+              if (btnFill && isGoogleForm && (formQuestions.length > 0 || hasFormNextPage)) {
                 btnFill.disabled = false;
               }
             }

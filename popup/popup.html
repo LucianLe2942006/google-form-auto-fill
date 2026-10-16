@@ -114,6 +114,13 @@
               <span class="persona-desc">Objective pros & cons</span>
             </div>
           </div>
+          <div class="persona-card" data-persona="random">
+            <div class="persona-icon">🎲</div>
+            <div class="persona-info">
+              <span class="persona-name">Random</span>
+              <span class="persona-desc">Tự nhiên & ngẫu nhiên đa dạng</span>
+            </div>
+          </div>
           <div class="persona-card" data-persona="custom">
             <div class="persona-icon">🎨</div>
             <div class="persona-info">
@@ -291,12 +298,19 @@
       </div>
 
       <!-- Module B: Weighted Random Answer Rules -->
-      <div class="schedule-card" style="margin-top: 14px;">
+      <div class="schedule-card" id="weighted-rules-module-card" style="margin-top: 14px;">
+        <div id="weighted-rules-disabled-banner" class="module-disabled-banner" style="display: none;">
+          <span class="banner-icon">🔒</span>
+          <span id="weighted-rules-disabled-msg">Cấu hình tỉ lệ đang tắt vì bạn đang chọn Persona khác. Hãy chuyển sang Persona "Random" để kích hoạt.</span>
+        </div>
         <div class="schedule-card-header">
           <div class="schedule-title-group">
             <div class="schedule-icon">🎯</div>
             <div>
-              <h3 class="schedule-title">Tỉ lệ chọn đáp án (Weighted Random)</h3>
+              <h3 class="schedule-title">
+                Tỉ lệ chọn đáp án (Weighted Random)
+                <span id="rules-count-badge" class="badge-count" style="display: none; margin-left: 8px; font-size: 11px; padding: 2px 7px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border-radius: 10px;">100% câu hỏi (Đa trang)</span>
+              </h3>
               <p class="schedule-desc">Can thiệp xác suất chọn đáp án (A: 50%, B: 30%, C: 20%) theo phân phối tích lũy.</p>
             </div>
           </div>
@@ -396,6 +410,50 @@ Rất hài lòng với trải nghiệm lần này</textarea>
 
         <div id="text-rules-empty-state" class="rules-empty-state" style="margin-top: 8px;">
           <p>Chưa có câu tự luận nào. Bấm <strong>📥 Nạp câu tự luận từ Form</strong> hoặc <strong>+ Thêm câu</strong> để cấu hình.</p>
+        </div>
+      </div>
+
+      <!-- Module D: Personal Profile Information Rules (Họ tên, SĐT, Email, MSSV...) -->
+      <div class="schedule-card" style="margin-top: 14px;" id="profile-rules-module">
+        <div class="schedule-card-header">
+          <div class="schedule-title-group">
+            <div class="schedule-icon">👤</div>
+            <div>
+              <h3 class="schedule-title">Thông tin cá nhân (Họ tên, SĐT, Email, MSSV...)</h3>
+              <p class="schedule-desc">Tự động nhận diện và điền dữ liệu cá nhân (tự sinh ngẫu nhiên VN hoặc dữ liệu tùy chỉnh).</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="schedule-body">
+          <div class="mode-selector-row">
+            <label class="mode-radio-label">
+              <input type="radio" name="profile-mode" value="skip" checked>
+              <span>⚪ Để trống (Bỏ qua)</span>
+            </label>
+            <label class="mode-radio-label">
+              <input type="radio" name="profile-mode" value="fake">
+              <span>🎭 Fake thông tin</span>
+            </label>
+          </div>
+
+          <!-- Custom Profile Data Textarea Container (displayed when 'fake' is selected) -->
+          <div id="profile-custom-container" class="text-mode-input-container" style="display: none; margin-top: 10px;">
+            <label for="profile-custom-textarea" class="field-label-sm" style="margin-bottom: 4px; display: block; font-weight: 600; color: #cbd5e1;">
+              Dữ liệu tùy chỉnh (tùy chọn):
+            </label>
+            <textarea id="profile-custom-textarea" class="styled-textarea-sm" rows="6" placeholder="Để trống ô này để extension tự sinh ngẫu nhiên (Tên VN, SĐT VN, Email). Hoặc nhập thông tin cụ thể (mỗi mục một dòng hoặc ngăn cách dấu phẩy để random).
+
+Ví dụ:
+Họ tên: Nguyễn Văn An, Trần Minh Quân, Lê Hoàng Nam
+SĐT: 0912345678, 0987654321
+Email: minhquan2003@gmail.com
+MSSV: B21DCCN001"></textarea>
+          </div>
+
+          <div class="schedule-hint-box" style="margin-top: 10px;">
+            💡 <em>Khi chọn &quot;Fake thông tin&quot;, extension sẽ quét các trường Họ tên, SĐT (đúng 10 số đầu mạng VN: 09x, 08x, 03x, 07x), Email, MSSV để tự động điền giá trị tương ứng. Nếu ô tùy chỉnh để trống hoặc thiếu trường nào, extension sẽ tự sinh ngẫu nhiên tiếng Việt.</em>
+          </div>
         </div>
       </div>
 
@@ -567,6 +625,7 @@ Rất hài lòng với trải nghiệm lần này</textarea>
         <button id="btn-save-settings" class="btn-save">
           <span>💾 Save All Settings</span>
         </button>
+        <span class="field-feedback" id="settings-feedback" style="display: block; text-align: center; margin-top: 6px;"></span>
       </div>
     </section>
   </div>

@@ -126,6 +126,19 @@
   animation: fmindPulseBtn 1.2s infinite ease-in-out;
 }
 
+.fmind-btn-fill.fmind-btn-running {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.fmind-btn-fill.fmind-btn-running:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.6) !important;
+}
+
 @keyframes fmindPulseBtn {
   0%, 100% {
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
@@ -135,6 +148,144 @@
     box-shadow: 0 4px 18px rgba(168, 85, 247, 0.8);
     transform: scale(1.02);
   }
+}
+
+/* Terminate Button (Emergency Stop) */
+.fmind-btn-terminate {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #ffffff;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  outline: none;
+}
+
+.fmind-btn-terminate:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.65);
+  transform: scale(1.03);
+}
+
+.fmind-btn-terminate:active {
+  transform: scale(0.96);
+}
+
+/* Divider */
+.fmind-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.16);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* Debug Mode Switch / Label */
+.fmind-debug-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fmind-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.fmind-debug-label:hover {
+  color: var(--fmind-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.fmind-debug-label.fmind-debug-on {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+/* Download Bug Report Button */
+.fmind-btn-bug-report {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #94a3b8;
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.fmind-btn-bug-report:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(51, 65, 85, 0.95);
+  transform: scale(1.02);
+}
+
+.fmind-btn-bug-report.debug-active {
+  color: #fef08a;
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+}
+
+.fmind-btn-bug-report.has-logs {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.6);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.22), rgba(185, 28, 28, 0.32));
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  animation: fmindLogBadgePulse 2.5s infinite ease-in-out;
+}
+
+@keyframes fmindLogBadgePulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+  }
+}
+
+/* Clear Bug Logs Quick Button */
+.fmind-btn-clear-logs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fmind-btn-clear-logs:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+  color: #ffffff;
+  transform: scale(1.08);
 }
 
 /* Checkbox & Switch for Auto Next */
@@ -243,6 +394,23 @@
   50% {
     border-color: rgba(168, 85, 247, 0.85);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(168, 85, 247, 0.55);
+  }
+}
+
+/* Retry Bar (High Demand & System Overload) */
+.fmind-retry-bar {
+  justify-content: center;
+  animation: fmindRetryPulse 1.6s infinite ease-in-out;
+}
+
+@keyframes fmindRetryPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 8px 28px rgba(245, 158, 11, 0.55);
   }
 }
 

@@ -21,6 +21,13 @@ const PERSONA_TEMPLATES = {
 - In ratings and linear scales, select moderate, middle scores (e.g., 3/5 or 4/5 depending on context).
 - For open text and paragraph questions, provide reasoned answers that acknowledge both pros and cons fairly and constructively.`,
 
+  random: `You are an unbiased, realistically diverse respondent who answers with natural randomness.
+- For multiple choice/radios and dropdowns: Pick options randomly with a varied, authentic distribution across different questions. Do NOT pick the same option index every time.
+- In ratings and linear scales: Choose realistically varied scores (e.g. natural mix of 3, 4, 5, or 2, 3, 4) without extreme bias.
+- For checkboxes: Pick a random, valid subset of options strictly respecting minChoices, maxChoices, and exactChoices constraints.
+- For grid questions: Distribute column choices randomly and realistically across rows so the pattern looks human and authentic.
+- For open text and paragraph questions: Write concise, casual, yet coherent answers with diverse, realistic perspectives.`,
+
   custom: `You are responding based strictly on the user's custom persona instructions.`
 };
 
@@ -95,7 +102,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (chrome?.alarms) {
           await chrome.alarms.clear('formmind_cooldown_alarm');
         }
-        await executeCooldownTrigger(sender?.tab?.id);
+        // Luôn đặt active: false khi nhận SKIP
+        await chrome.storage.local.set({
+          formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 },
+          formmind_auto_start_next_run: true,
+          isRunning: true,
+          retryCount: 0,
+          formmind_retry_count: 0
+        });
         sendResponse({ success: true });
       } catch (err) {
         console.error('[FormMind Background] Skip cooldown error:', err);
@@ -112,8 +126,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           await chrome.alarms.clear('formmind_cooldown_alarm');
         }
         await chrome.storage.local.set({
-          formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 }
+          formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 },
+          isRunning: false,
+          retryCount: 0,
+          formmind_retry_count: 0
         });
+        await chrome.storage.local.remove([
+          'formmind_active_session',
+          'formmind_auto_start_next_run'
+        ]);
         sendResponse({ success: true });
       } catch (err) {
         console.error('[FormMind Background] Cancel cooldown error:', err);
@@ -144,10 +165,17 @@ async function executeCooldownTrigger(preferredTabId = null) {
     const data = await chrome.storage.local.get([
       'formmind_cooldown_state',
       'formmind_form_url',
-      'formmind_cooldown_config'
+      'formmind_cooldown_config',
+      'isRunning'
     ]);
 
     const state = data?.formmind_cooldown_state || {};
+    // Anti-reload safety guard: if cooldown was cancelled or inactive, or isRunning is false (Terminated), abort!
+    if (state.active === false || data.isRunning === false) {
+      console.log('[FormMind Background] Cooldown is cancelled/inactive or automation is stopped. Refusing to reload tab.');
+      return;
+    }
+
     const formUrl = (data?.formmind_form_url || state?.formUrl || '').trim();
     const config = data?.formmind_cooldown_config || {};
 
@@ -204,10 +232,10 @@ async function handleGenerateAnswers(payload = {}) {
   let provider = payload?.provider || 'gemini';
   let apiKey = payload?.apiKey;
 
-  // If apiKey is missing in the message, look up directly from chrome.storage.sync
+  // If apiKey is missing in the message, look up directly from chrome.storage (merging local and sync)
   if (!apiKey || !apiKey.trim()) {
     try {
-      const stored = await chrome.storage.sync.get([
+      const storedLocal = (chrome?.storage?.local ? await chrome.storage.local.get([
         'geminiKey',
         'groqKey',
         'huggingfaceKey',
@@ -215,7 +243,17 @@ async function handleGenerateAnswers(payload = {}) {
         'anthropicKey',
         'openrouterKey',
         'selectedModel'
-      ]);
+      ]) : {}) || {};
+      const storedSync = (chrome?.storage?.sync ? await chrome.storage.sync.get([
+        'geminiKey',
+        'groqKey',
+        'huggingfaceKey',
+        'openaiKey',
+        'anthropicKey',
+        'openrouterKey',
+        'selectedModel'
+      ]) : {}) || {};
+      const stored = { ...storedSync, ...storedLocal };
       const keyMap = {
         gemini: stored.geminiKey,
         groq: stored.groqKey,

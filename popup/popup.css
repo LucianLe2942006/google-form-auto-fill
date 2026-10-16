@@ -1211,6 +1211,26 @@ select, option, optgroup, input, textarea {
   flex-shrink: 0;
 }
 
+.rule-type-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.rule-type-badge.checkbox {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.rule-type-badge.radio {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
 .rule-title-hint {
   font-size: 11px;
   color: #94a3b8;
@@ -1259,6 +1279,18 @@ select, option, optgroup, input, textarea {
   padding: 5px 8px;
   font-size: 11.5px;
   outline: none;
+}
+
+.rule-type-select {
+  width: 105px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
 }
 
 .rule-options-container {
@@ -1511,6 +1543,34 @@ select, option, optgroup, input, textarea {
   color: #94a3b8;
   font-style: italic;
   padding: 4px 0;
+}
+
+/* Trạng thái làm mờ và vô hiệu hóa Module Tỉ lệ */
+.module-disabled-by-persona {
+  opacity: 0.38 !important;
+  filter: grayscale(0.9) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: not-allowed !important;
+}
+
+.module-disabled-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: #ef4444;
+  line-height: 1.4;
+}
+
+.module-disabled-banner .banner-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 
