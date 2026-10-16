@@ -124,6 +124,8 @@
     setupModelControls();
     setupSettingsHandlers();
     setupFillHandler();
+    setupFormUrlAndAutoNext();
+    setupScheduleTab();
 
     if (btnRefresh) {
       btnRefresh.addEventListener('click', () => {
@@ -440,18 +442,6 @@
           if (selectedPersona === 'custom' && customContainer) {
             customContainer.style.display = 'block';
           }
-        }
-
-        const chkAutoAdvance = document.getElementById('chk-auto-advance');
-        if (chkAutoAdvance) {
-          if (data.autoAdvancePages !== undefined) {
-            chkAutoAdvance.checked = data.autoAdvancePages !== false;
-          }
-          chkAutoAdvance.addEventListener('change', () => {
-            if (chrome.storage && chrome.storage.sync) {
-              chrome.storage.sync.set({ autoAdvancePages: chkAutoAdvance.checked });
-            }
-          });
         }
 
         updateApiBadge();
@@ -1081,7 +1071,7 @@
         }
 
         const chkAutoAdvance = document.getElementById('chk-auto-advance');
-        const autoAdvance = chkAutoAdvance ? chkAutoAdvance.checked : true;
+        const autoAdvance = chkAutoAdvance ? chkAutoAdvance.checked : false;
 
         // Start Fill Process
         btnFill.disabled = true;
@@ -1163,7 +1153,904 @@
       });
     }
 
-    // Listen for storage changes from in-page floating widget
+    /**
+     * Format milliseconds into HH:mm:ss or mm:ss
+     */
+    function formatMsToTime(ms) {
+      if (!ms || ms <= 0) return '00:00:00';
+      const totalSecs = Math.max(0, Math.floor(ms / 1000));
+      const hours = Math.floor(totalSecs / 3600);
+      const minutes = Math.floor((totalSecs % 3600) / 60);
+      const seconds = totalSecs % 60;
+      const pad = n => String(n).padStart(2, '0');
+      if (hours > 0) {
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+      }
+      return `${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    /**
+     * Setup Form URL and Auto Next checkbox with two-way sync
+     */
+    function setupFormUrlAndAutoNext() {
+      const popupFormUrlInput = document.getElementById('popup-form-url');
+      const btnGetCurrentUrl = document.getElementById('btn-get-current-url');
+      const chkAutoAdvance = document.getElementById('chk-auto-advance');
+
+      if (chrome?.storage?.local) {
+        chrome.storage.local.get(['formmind_form_url', 'formmind_auto_next'], (res) => {
+          if (popupFormUrlInput && res?.formmind_form_url) {
+            popupFormUrlInput.value = res.formmind_form_url;
+          }
+          if (chkAutoAdvance) {
+            // Default is OFF (unchecked) per specifications
+            chkAutoAdvance.checked = !!(res && res.formmind_auto_next);
+          }
+        });
+      }
+
+      if (chkAutoAdvance) {
+        chkAutoAdvance.addEventListener('change', () => {
+          chrome.storage.local.set({ formmind_auto_next: chkAutoAdvance.checked });
+        });
+      }
+
+      if (popupFormUrlInput) {
+        let urlDebounce = null;
+        popupFormUrlInput.addEventListener('input', () => {
+          clearTimeout(urlDebounce);
+          urlDebounce = setTimeout(() => {
+            chrome.storage.local.set({ formmind_form_url: popupFormUrlInput.value.trim() });
+          }, 350);
+        });
+        popupFormUrlInput.addEventListener('blur', () => {
+          chrome.storage.local.set({ formmind_form_url: popupFormUrlInput.value.trim() });
+        });
+      }
+
+      if (btnGetCurrentUrl) {
+        btnGetCurrentUrl.addEventListener('click', () => {
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs[0] && tabs[0].url) {
+              const tabUrl = tabs[0].url;
+              if (popupFormUrlInput) popupFormUrlInput.value = tabUrl;
+              chrome.storage.local.set({ formmind_form_url: tabUrl });
+              btnGetCurrentUrl.innerHTML = '<span>✅ Đã lấy!</span>';
+              setTimeout(() => {
+                btnGetCurrentUrl.innerHTML = '<span>🎯 Lấy URL tab này</span>';
+              }, 1500);
+            }
+          });
+        });
+      }
+    }
+
+    let globalUpdateScheduleCooldown = null;
+    let globalUpdateWeightedRules = null;
+
+    /**
+     * Setup Schedule Tab: Module A (Cooldown) and Module B (Weighted Rules)
+     */
+    function setupScheduleTab() {
+      const popupCooldownBanner = document.getElementById('popup-cooldown-banner');
+      const popupCooldownTimer = document.getElementById('popup-cooldown-timer');
+      const btnPopupSkipCooldown = document.getElementById('btn-popup-skip-cooldown');
+      const btnPopupCancelCooldown = document.getElementById('btn-popup-cancel-cooldown');
+      const chkCooldownEnabled = document.getElementById('chk-cooldown-enabled');
+      const cooldownMinInput = document.getElementById('cooldown-min-val');
+      const cooldownMaxInput = document.getElementById('cooldown-max-val');
+      const cooldownUnitSelect = document.getElementById('cooldown-unit-select');
+      const chkCooldownAutoSubmit = document.getElementById('chk-cooldown-auto-submit');
+      const chkCooldownAutoRestart = document.getElementById('chk-cooldown-auto-restart');
+      const cooldownPreviewHint = document.getElementById('cooldown-preview-hint');
+
+      const btnAddWeightedRule = document.getElementById('btn-add-weighted-rule');
+      const btnBatchRandomizeRules = document.getElementById('btn-batch-randomize-rules');
+      const btnImportFormRules = document.getElementById('btn-import-form-rules');
+      const weightedRulesContainer = document.getElementById('weighted-rules-container');
+      const rulesEmptyState = document.getElementById('rules-empty-state');
+      const btnSaveSchedule = document.getElementById('btn-save-schedule');
+      const scheduleFeedback = document.getElementById('schedule-feedback');
+
+      let currentWeightedRules = [];
+      let popupCooldownInterval = null;
+
+      /**
+       * Generate random integer percentages for a given count summing to exactly 100%
+       * @param {number} count Number of options
+       * @returns {number[]} Array of integers summing to 100
+       */
+      function generatePercentages(count) {
+        if (!count || count <= 0) return [];
+        if (count === 1) return [100];
+
+        // 1. Sinh count số thực ngẫu nhiên với minimum base để phân bổ tự nhiên
+        const raw = Array.from({ length: count }, () => Math.random() + 0.15);
+        const sumRaw = raw.reduce((a, b) => a + b, 0);
+
+        // 2. Quy đổi sang phần trăm nguyên
+        const percentages = raw.map(v => Math.floor((v / sumRaw) * 100));
+
+        // 3. Tính phần dư bù trừ
+        let diff = 100 - percentages.reduce((a, b) => a + b, 0);
+
+        // 4. Cộng dồn bù diff vào các phần tử lớn nhất để tổng luôn luôn đạt chuẩn xác 100
+        while (diff > 0) {
+          let maxIdx = 0;
+          for (let i = 1; i < percentages.length; i++) {
+            if (percentages[i] > percentages[maxIdx]) maxIdx = i;
+          }
+          percentages[maxIdx] += 1;
+          diff--;
+        }
+        while (diff < 0) {
+          let maxIdx = 0;
+          for (let i = 1; i < percentages.length; i++) {
+            if (percentages[i] > percentages[maxIdx]) maxIdx = i;
+          }
+          if (percentages[maxIdx] > 0) percentages[maxIdx] -= 1;
+          diff++;
+        }
+
+        return percentages;
+      }
+
+      /**
+       * Auto-import detected choice-based questions from active form into currentWeightedRules
+       */
+      function importRulesFromFormQuestions() {
+        if (!formQuestions || formQuestions.length === 0) {
+          return false;
+        }
+
+        const eligible = formQuestions.filter(q => {
+          return (q.options && q.options.length > 1) || q.type === 'scale' || q.type === 'radio' || q.type === 'checkbox' || q.type === 'dropdown';
+        });
+
+        if (eligible.length === 0) {
+          return false;
+        }
+
+        const imported = eligible.map((q, idx) => {
+          let opts = [];
+          if (q.options && q.options.length > 0) {
+            opts = q.options.map(optLabel => ({ label: optLabel, weight: 0 }));
+          } else if (q.type === 'scale') {
+            const min = q.scaleMin || 1;
+            const max = q.scaleMax || 5;
+            opts = [];
+            for (let i = min; i <= max; i++) {
+              opts.push({ label: String(i), weight: 0 });
+            }
+          } else {
+            opts = [
+              { label: 'Lựa chọn A', weight: 0 },
+              { label: 'Lựa chọn B', weight: 0 }
+            ];
+          }
+
+          const qOrder = q.id !== undefined && !isNaN(parseInt(q.id, 10)) ? (parseInt(q.id, 10) + 1) : (idx + 1);
+
+          return {
+            id: 'rule_q_' + qOrder + '_' + Date.now(),
+            matchType: 'index',
+            matchValue: String(qOrder),
+            titleHint: q.title || `Câu hỏi ${qOrder}`,
+            options: opts
+          };
+        });
+
+        currentWeightedRules = imported;
+        return true;
+      }
+
+      function updateCooldownHint() {
+        if (!cooldownPreviewHint) return;
+        const min = parseFloat(cooldownMinInput?.value) || 1;
+        const max = parseFloat(cooldownMaxInput?.value) || 5;
+        const unit = cooldownUnitSelect?.value || 'm';
+        const unitName = unit === 's' ? 'giây' : unit === 'h' ? 'tiếng' : 'phút';
+        cooldownPreviewHint.innerHTML = `💡 <em>Mỗi lượt điền sẽ chờ ngẫu nhiên từ <strong>${min} ${unitName}</strong> đến <strong>${max} ${unitName}</strong> trước khi tải lại form.</em>`;
+      }
+
+      if (cooldownMinInput) cooldownMinInput.addEventListener('input', updateCooldownHint);
+      if (cooldownMaxInput) cooldownMaxInput.addEventListener('input', updateCooldownHint);
+      if (cooldownUnitSelect) cooldownUnitSelect.addEventListener('change', updateCooldownHint);
+
+      function checkAndRenderCooldownBanner(cdState) {
+        if (popupCooldownInterval) clearInterval(popupCooldownInterval);
+        if (!popupCooldownBanner) return;
+
+        if (cdState && cdState.active && cdState.endTime > Date.now()) {
+          popupCooldownBanner.style.display = 'block';
+          const updateClock = () => {
+            const rem = cdState.endTime - Date.now();
+            if (rem <= 0) {
+              popupCooldownBanner.style.display = 'none';
+              if (popupCooldownInterval) clearInterval(popupCooldownInterval);
+            } else if (popupCooldownTimer) {
+              popupCooldownTimer.textContent = formatMsToTime(rem);
+            }
+          };
+          updateClock();
+          popupCooldownInterval = setInterval(updateClock, 500);
+        } else {
+          popupCooldownBanner.style.display = 'none';
+        }
+      }
+
+      globalUpdateScheduleCooldown = checkAndRenderCooldownBanner;
+
+      if (btnPopupSkipCooldown) {
+        btnPopupSkipCooldown.addEventListener('click', () => {
+          chrome.runtime.sendMessage({ action: 'SKIP_COOLDOWN' });
+          if (popupCooldownBanner) popupCooldownBanner.style.display = 'none';
+          if (popupCooldownInterval) clearInterval(popupCooldownInterval);
+        });
+      }
+
+      if (btnPopupCancelCooldown) {
+        btnPopupCancelCooldown.addEventListener('click', () => {
+          chrome.runtime.sendMessage({ action: 'CANCEL_COOLDOWN' });
+          if (popupCooldownBanner) popupCooldownBanner.style.display = 'none';
+          if (popupCooldownInterval) clearInterval(popupCooldownInterval);
+        });
+      }
+
+      function renderRules() {
+        if (!weightedRulesContainer) return;
+        weightedRulesContainer.innerHTML = '';
+
+        if (!currentWeightedRules || currentWeightedRules.length === 0) {
+          if (rulesEmptyState) rulesEmptyState.style.display = 'block';
+          return;
+        }
+        if (rulesEmptyState) rulesEmptyState.style.display = 'none';
+
+        currentWeightedRules.forEach((rule, rIdx) => {
+          const card = document.createElement('div');
+          card.className = 'rule-card';
+          card.dataset.ruleIdx = rIdx;
+
+          const totalWeight = (rule.options || []).reduce((s, o) => s + (parseFloat(o.weight) || 0), 0);
+          const isValid100 = Math.abs(totalWeight - 100) < 0.1;
+          const isIndexMatch = rule.matchType === 'index';
+          const ruleLabel = isIndexMatch
+            ? `Câu ${rule.matchValue || (rIdx + 1)}`
+            : `Quy tắc #${rIdx + 1}`;
+          const titleHintHtml = rule.titleHint
+            ? `<span class="rule-title-hint" title="${escapeHtml(rule.titleHint)}">${escapeHtml(rule.titleHint)}</span>`
+            : '';
+
+          card.innerHTML = `
+            <div class="rule-card-header">
+              <div class="rule-badge-group">
+                <span class="rule-badge">${escapeHtml(ruleLabel)}</span>
+                ${titleHintHtml}
+              </div>
+              <button type="button" class="btn-delete-rule" data-action="delete-rule" data-rule-idx="${rIdx}" title="Xóa quy tắc này">✕</button>
+            </div>
+            <div class="rule-match-row">
+              <select class="rule-match-select" data-action="change-match-type" data-rule-idx="${rIdx}">
+                <option value="index" ${isIndexMatch ? 'selected' : ''}>Số thứ tự (STT)</option>
+                <option value="title" ${!isIndexMatch ? 'selected' : ''}>Từ khóa tiêu đề</option>
+              </select>
+              <input type="text" class="rule-match-input" data-action="change-match-val" data-rule-idx="${rIdx}"
+                value="${escapeHtml(rule.matchValue || '')}"
+                placeholder="${isIndexMatch ? 'Số câu (vd: 1, 2, 3...)' : 'Từ khóa (vd: giới tính, độ tuổi, hài lòng...)'}">
+            </div>
+            <div class="rule-options-container" id="rule-opts-${rIdx}"></div>
+            <button type="button" class="btn-add-opt" data-action="add-option" data-rule-idx="${rIdx}">+ Thêm lựa chọn</button>
+            <div class="rule-footer-bar">
+              <span class="rule-total-status ${isValid100 ? 'valid' : 'invalid'}">
+                ${isValid100 ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(totalWeight)}% (chưa bằng 100%)`}
+              </span>
+              ${!isValid100 ? `<button type="button" class="btn-normalize-100" data-action="normalize-100" data-rule-idx="${rIdx}">⚖️ Tự cân bằng 100%</button>` : ''}
+            </div>
+          `;
+
+          const optsContainer = card.querySelector(`#rule-opts-${rIdx}`);
+          (rule.options || []).forEach((opt, oIdx) => {
+            const row = document.createElement('div');
+            row.className = 'rule-option-row';
+            row.innerHTML = `
+              <input type="text" class="rule-option-input" data-action="edit-opt-label" data-rule-idx="${rIdx}" data-opt-idx="${oIdx}"
+                value="${escapeHtml(opt.label || '')}" placeholder="Tên đáp án (vd: Nam, Nữ, A, B...)">
+              <input type="number" class="rule-weight-input" min="0" max="100" data-action="edit-opt-weight" data-rule-idx="${rIdx}" data-opt-idx="${oIdx}"
+                value="${opt.weight}">
+              <span class="rule-weight-pct">%</span>
+              <button type="button" class="btn-remove-opt" data-action="remove-option" data-rule-idx="${rIdx}" data-opt-idx="${oIdx}" title="Xóa lựa chọn này">✕</button>
+            `;
+            optsContainer.appendChild(row);
+          });
+
+          weightedRulesContainer.appendChild(card);
+        });
+      }
+
+      globalUpdateWeightedRules = (newRules) => {
+        currentWeightedRules = newRules;
+        renderRules();
+      };
+
+      /**
+       * 1-Click Batch Randomize Distribution Handler
+       */
+      function handleBatchRandomize() {
+        // If empty, auto-import from formQuestions or fallback to default sample questions
+        if (!currentWeightedRules || currentWeightedRules.length === 0) {
+          const imported = importRulesFromFormQuestions();
+          if (!imported) {
+            currentWeightedRules = [
+              {
+                id: 'rule_1',
+                matchType: 'index',
+                matchValue: '1',
+                titleHint: 'Ví dụ: Đánh giá chất lượng dịch vụ',
+                options: [
+                  { label: 'Rất hài lòng', weight: 0 },
+                  { label: 'Hài lòng', weight: 0 },
+                  { label: 'Bình thường', weight: 0 },
+                  { label: 'Không hài lòng', weight: 0 }
+                ]
+              },
+              {
+                id: 'rule_2',
+                matchType: 'index',
+                matchValue: '2',
+                titleHint: 'Ví dụ: Bạn có muốn giới thiệu bạn bè không?',
+                options: [
+                  { label: 'Có', weight: 0 },
+                  { label: 'Không', weight: 0 }
+                ]
+              },
+              {
+                id: 'rule_3',
+                matchType: 'index',
+                matchValue: '3',
+                titleHint: 'Ví dụ: Độ tuổi của bạn',
+                options: [
+                  { label: 'Dưới 18', weight: 0 },
+                  { label: '18 - 25', weight: 0 },
+                  { label: '26 - 35', weight: 0 }
+                ]
+              }
+            ];
+          }
+          renderRules();
+        }
+
+        // Animate dice spin
+        const diceIcon = btnBatchRandomizeRules?.querySelector('.btn-dice');
+        if (diceIcon) {
+          diceIcon.style.transform = 'rotate(360deg) scale(1.25)';
+          setTimeout(() => {
+            if (diceIcon) diceIcon.style.transform = '';
+          }, 450);
+        }
+
+        // Batch distribute independent percentages for each question
+        const ruleCards = weightedRulesContainer?.querySelectorAll('.rule-card') || [];
+
+        currentWeightedRules.forEach((rule, rIdx) => {
+          const opts = rule.options || [];
+          if (opts.length === 0) return;
+
+          // Generate independent random percentage distribution summing to exactly 100%
+          const pcts = generatePercentages(opts.length);
+
+          // Update model
+          opts.forEach((o, oIdx) => {
+            o.weight = pcts[oIdx];
+          });
+
+          // In-place DOM update with input event dispatching for reactivity
+          const card = ruleCards[rIdx];
+          if (card) {
+            const weightInputs = card.querySelectorAll('.rule-weight-input');
+            weightInputs.forEach((input, oIdx) => {
+              if (pcts[oIdx] !== undefined) {
+                input.value = pcts[oIdx];
+                input.classList.remove('flashing');
+                void input.offsetWidth; // Trigger reflow for CSS animation
+                input.classList.add('flashing');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            });
+
+            const statusEl = card.querySelector('.rule-total-status');
+            if (statusEl) {
+              statusEl.className = 'rule-total-status valid';
+              statusEl.textContent = '✅ Tổng: 100%';
+            }
+
+            const normBtn = card.querySelector('.btn-normalize-100');
+            if (normBtn) normBtn.remove();
+          }
+        });
+
+        if (scheduleFeedback) {
+          scheduleFeedback.className = 'field-feedback success';
+          scheduleFeedback.textContent = `🎲 Đã tự động phân bổ ngẫu nhiên tỉ lệ 100% cho tất cả ${currentWeightedRules.length} câu hỏi! Bấm "Lưu cấu hình" để áp dụng.`;
+          setTimeout(() => {
+            if (scheduleFeedback && scheduleFeedback.textContent.includes('🎲')) {
+              scheduleFeedback.textContent = '';
+            }
+          }, 4000);
+        }
+      }
+
+      if (btnBatchRandomizeRules) {
+        btnBatchRandomizeRules.addEventListener('click', handleBatchRandomize);
+      }
+
+      if (btnImportFormRules) {
+        btnImportFormRules.addEventListener('click', () => {
+          const ok = importRulesFromFormQuestions();
+          if (ok) {
+            renderRules();
+            if (scheduleFeedback) {
+              scheduleFeedback.className = 'field-feedback success';
+              scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentWeightedRules.length} câu hỏi từ Google Form! Bấm "🎲 Random tất cả tỉ lệ" để phân bổ.`;
+              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+            }
+          } else {
+            if (scheduleFeedback) {
+              scheduleFeedback.className = 'field-feedback error';
+              scheduleFeedback.textContent = '⚠️ Chưa tìm thấy câu hỏi nào trong form. Vui lòng mở trang Google Form.';
+              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+            }
+          }
+        });
+      }
+
+      if (weightedRulesContainer) {
+        weightedRulesContainer.addEventListener('input', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          const oIdx = parseInt(e.target.dataset.optIdx, 10);
+          if (isNaN(rIdx) || !currentWeightedRules[rIdx]) return;
+
+          if (action === 'change-match-val') {
+            currentWeightedRules[rIdx].matchValue = e.target.value;
+          } else if (action === 'edit-opt-label') {
+            if (currentWeightedRules[rIdx].options[oIdx]) {
+              currentWeightedRules[rIdx].options[oIdx].label = e.target.value;
+            }
+          } else if (action === 'edit-opt-weight') {
+            if (currentWeightedRules[rIdx].options[oIdx]) {
+              currentWeightedRules[rIdx].options[oIdx].weight = parseFloat(e.target.value) || 0;
+              const card = e.target.closest('.rule-card');
+              if (card) {
+                const total = (currentWeightedRules[rIdx].options || []).reduce((s, o) => s + (parseFloat(o.weight) || 0), 0);
+                const valid = Math.abs(total - 100) < 0.1;
+                const statusEl = card.querySelector('.rule-total-status');
+                if (statusEl) {
+                  statusEl.className = `rule-total-status ${valid ? 'valid' : 'invalid'}`;
+                  statusEl.textContent = valid ? '✅ Tổng: 100%' : `⚠️ Tổng: ${Math.round(total)}% (chưa bằng 100%)`;
+                }
+              }
+            }
+          }
+        });
+
+        weightedRulesContainer.addEventListener('change', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          if (isNaN(rIdx) || !currentWeightedRules[rIdx]) return;
+
+          if (action === 'change-match-type') {
+            currentWeightedRules[rIdx].matchType = e.target.value;
+            renderRules();
+          }
+        });
+
+        weightedRulesContainer.addEventListener('click', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          const oIdx = parseInt(e.target.dataset.optIdx, 10);
+          if (isNaN(rIdx) || !currentWeightedRules[rIdx]) return;
+
+          if (action === 'delete-rule') {
+            currentWeightedRules.splice(rIdx, 1);
+            renderRules();
+          } else if (action === 'add-option') {
+            const opts = currentWeightedRules[rIdx].options || [];
+            opts.push({ label: `Đáp án ${opts.length + 1}`, weight: 0 });
+            currentWeightedRules[rIdx].options = opts;
+            renderRules();
+          } else if (action === 'remove-option') {
+            currentWeightedRules[rIdx].options.splice(oIdx, 1);
+            renderRules();
+          } else if (action === 'normalize-100') {
+            const opts = currentWeightedRules[rIdx].options || [];
+            const sum = opts.reduce((s, o) => s + (parseFloat(o.weight) || 0), 0);
+            if (sum > 0) {
+              let running = 0;
+              opts.forEach((o, i) => {
+                if (i === opts.length - 1) {
+                  o.weight = Math.max(0, 100 - running);
+                } else {
+                  const share = Math.round(((parseFloat(o.weight) || 0) / sum) * 100);
+                  o.weight = share;
+                  running += share;
+                }
+              });
+            } else if (opts.length > 0) {
+              const even = Math.floor(100 / opts.length);
+              opts.forEach((o, i) => {
+                o.weight = i === opts.length - 1 ? 100 - (even * (opts.length - 1)) : even;
+              });
+            }
+            renderRules();
+          }
+        });
+      }
+
+      if (btnAddWeightedRule) {
+        btnAddWeightedRule.addEventListener('click', () => {
+          currentWeightedRules.push({
+            id: 'rule_' + Date.now(),
+            matchType: 'index',
+            matchValue: String(currentWeightedRules.length + 1),
+            options: [
+              { label: 'Lựa chọn A', weight: 50 },
+              { label: 'Lựa chọn B', weight: 50 }
+            ]
+          });
+          renderRules();
+        });
+      }
+
+      // --- Module C: Text & Essay Input Question Rules ---
+      const textRulesContainer = document.getElementById('text-rules-container');
+      const textRulesEmptyState = document.getElementById('text-rules-empty-state');
+      const btnAddTextRule = document.getElementById('btn-add-text-rule');
+      const btnImportFormTextRules = document.getElementById('btn-import-form-text-rules');
+      const btnApplyAllTextMode = document.getElementById('btn-apply-all-text-mode');
+      const globalFixedInput = document.getElementById('global-fixed-input');
+      const globalListTextarea = document.getElementById('global-list-textarea');
+      const globalFixedContainer = document.getElementById('global-fixed-container');
+      const globalListContainer = document.getElementById('global-list-container');
+      const globalModeRadios = document.querySelectorAll('input[name="global-text-mode"]');
+
+      let currentTextRules = [];
+      let globalTextConfig = {
+        type: 'text',
+        mode: 'fixed',
+        fixedValue: 'Không có ý kiến gì thêm',
+        listValues: [
+          'Dịch vụ rất tốt, nhân viên nhiệt tình',
+          'Sản phẩm dùng ổn trong tầm giá',
+          'Cần cải thiện tốc độ giao hàng',
+          'Rất hài lòng với trải nghiệm lần này'
+        ]
+      };
+
+      function updateGlobalModeUI() {
+        const selectedRadio = document.querySelector('input[name="global-text-mode"]:checked');
+        const mode = selectedRadio ? selectedRadio.value : 'fixed';
+        globalTextConfig.mode = mode;
+
+        if (globalFixedContainer) {
+          globalFixedContainer.style.display = mode === 'fixed' ? 'block' : 'none';
+        }
+        if (globalListContainer) {
+          globalListContainer.style.display = mode === 'random_list' ? 'block' : 'none';
+        }
+      }
+
+      globalModeRadios.forEach(radio => {
+        radio.addEventListener('change', updateGlobalModeUI);
+      });
+
+      if (globalFixedInput) {
+        globalFixedInput.addEventListener('input', () => {
+          globalTextConfig.fixedValue = globalFixedInput.value;
+        });
+      }
+
+      if (globalListTextarea) {
+        globalListTextarea.addEventListener('input', () => {
+          globalTextConfig.listValues = globalListTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+        });
+      }
+
+      function renderTextRules() {
+        if (!textRulesContainer) return;
+        textRulesContainer.innerHTML = '';
+
+        if (!currentTextRules || currentTextRules.length === 0) {
+          if (textRulesEmptyState) textRulesEmptyState.style.display = 'block';
+          return;
+        }
+        if (textRulesEmptyState) textRulesEmptyState.style.display = 'none';
+
+        currentTextRules.forEach((rule, rIdx) => {
+          const card = document.createElement('div');
+          card.className = 'text-rule-card';
+          card.dataset.textRuleIdx = rIdx;
+
+          const isIndexMatch = rule.matchType === 'index';
+          const ruleLabel = isIndexMatch ? `Câu ${rule.matchValue || (rIdx + 1)} (Tự luận)` : `Quy tắc Tự luận #${rIdx + 1}`;
+          const titleHintHtml = rule.titleHint
+            ? `<span class="rule-title-hint" title="${escapeHtml(rule.titleHint)}">${escapeHtml(rule.titleHint)}</span>`
+            : '';
+          const mode = rule.mode || 'fixed';
+          const listText = Array.isArray(rule.listValues) ? rule.listValues.join('\n') : (rule.listValues || '');
+
+          card.innerHTML = `
+            <div class="rule-card-header">
+              <div class="rule-badge-group">
+                <span class="text-mode-badge">${escapeHtml(ruleLabel)}</span>
+                ${titleHintHtml}
+              </div>
+              <button type="button" class="btn-delete-rule" data-action="delete-text-rule" data-rule-idx="${rIdx}" title="Xóa câu tự luận này">✕</button>
+            </div>
+            <div class="rule-match-row">
+              <select class="rule-match-select" data-action="change-text-match-type" data-rule-idx="${rIdx}">
+                <option value="index" ${isIndexMatch ? 'selected' : ''}>Số thứ tự (STT)</option>
+                <option value="title" ${!isIndexMatch ? 'selected' : ''}>Từ khóa tiêu đề</option>
+              </select>
+              <input type="text" class="rule-match-input" data-action="change-text-match-val" data-rule-idx="${rIdx}"
+                value="${escapeHtml(rule.matchValue || '')}"
+                placeholder="${isIndexMatch ? 'Số câu (vd: 1, 2, 3...)' : 'Từ khóa (vd: ý kiến, nhận xét, họ tên...)'}">
+            </div>
+            <div class="mode-selector-row" style="margin-top: 4px;">
+              <label class="mode-radio-label">
+                <input type="radio" name="text-mode-${rIdx}" value="skip" ${mode === 'skip' ? 'checked' : ''} data-action="change-item-mode" data-rule-idx="${rIdx}">
+                <span>🚫 Bỏ qua</span>
+              </label>
+              <label class="mode-radio-label">
+                <input type="radio" name="text-mode-${rIdx}" value="fixed" ${mode === 'fixed' ? 'checked' : ''} data-action="change-item-mode" data-rule-idx="${rIdx}">
+                <span>📌 Điền cố định</span>
+              </label>
+              <label class="mode-radio-label">
+                <input type="radio" name="text-mode-${rIdx}" value="random_list" ${mode === 'random_list' ? 'checked' : ''} data-action="change-item-mode" data-rule-idx="${rIdx}">
+                <span>🎲 Random theo list</span>
+              </label>
+            </div>
+            <div class="text-mode-input-container">
+              ${mode === 'skip' ? `<p class="text-skip-notice">⚪ Trường này sẽ được bỏ qua, để trống khi điền.</p>` : ''}
+              ${mode === 'fixed' ? `
+                <input type="text" class="styled-input-sm" data-action="edit-fixed-val" data-rule-idx="${rIdx}"
+                  value="${escapeHtml(rule.fixedValue || '')}" placeholder="Nội dung cố định (vd: Không có ý kiến gì thêm)">
+              ` : ''}
+              ${mode === 'random_list' ? `
+                <textarea class="styled-textarea-sm" rows="3" data-action="edit-list-val" data-rule-idx="${rIdx}"
+                  placeholder="Mỗi đáp án mẫu trên 1 dòng...">${escapeHtml(listText)}</textarea>
+              ` : ''}
+            </div>
+          `;
+
+          textRulesContainer.appendChild(card);
+        });
+      }
+
+      if (textRulesContainer) {
+        textRulesContainer.addEventListener('input', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          if (isNaN(rIdx) || !currentTextRules[rIdx]) return;
+
+          if (action === 'change-text-match-val') {
+            currentTextRules[rIdx].matchValue = e.target.value;
+          } else if (action === 'edit-fixed-val') {
+            currentTextRules[rIdx].fixedValue = e.target.value;
+          } else if (action === 'edit-list-val') {
+            currentTextRules[rIdx].listValues = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+          }
+        });
+
+        textRulesContainer.addEventListener('change', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          if (isNaN(rIdx) || !currentTextRules[rIdx]) return;
+
+          if (action === 'change-text-match-type') {
+            currentTextRules[rIdx].matchType = e.target.value;
+            renderTextRules();
+          } else if (action === 'change-item-mode') {
+            currentTextRules[rIdx].mode = e.target.value;
+            renderTextRules();
+          }
+        });
+
+        textRulesContainer.addEventListener('click', (e) => {
+          const action = e.target.dataset.action;
+          const rIdx = parseInt(e.target.dataset.ruleIdx, 10);
+          if (isNaN(rIdx) || !currentTextRules[rIdx]) return;
+
+          if (action === 'delete-text-rule') {
+            currentTextRules.splice(rIdx, 1);
+            renderTextRules();
+          }
+        });
+      }
+
+      if (btnAddTextRule) {
+        btnAddTextRule.addEventListener('click', () => {
+          currentTextRules.push({
+            id: 'text_rule_' + Date.now(),
+            type: 'text',
+            matchType: 'index',
+            matchValue: String(currentTextRules.length + 1),
+            titleHint: '',
+            mode: globalTextConfig.mode || 'fixed',
+            fixedValue: globalTextConfig.fixedValue || 'Không có ý kiến gì thêm',
+            listValues: [...(globalTextConfig.listValues || [])]
+          });
+          renderTextRules();
+        });
+      }
+
+      // Import text & textarea questions from active form
+      function importTextRulesFromForm() {
+        if (!formQuestions || formQuestions.length === 0) return false;
+
+        const textQuestions = formQuestions.filter(q => q.type === 'text' || q.type === 'textarea');
+        if (textQuestions.length === 0) return false;
+
+        const imported = textQuestions.map((q, idx) => {
+          const qOrder = q.id !== undefined && !isNaN(parseInt(q.id, 10)) ? (parseInt(q.id, 10) + 1) : (idx + 1);
+          return {
+            id: 'text_q_' + qOrder + '_' + Date.now(),
+            type: 'text',
+            matchType: 'index',
+            matchValue: String(qOrder),
+            titleHint: q.title || `Câu hỏi tự luận ${qOrder}`,
+            mode: globalTextConfig.mode || 'fixed',
+            fixedValue: globalTextConfig.fixedValue || 'Không có ý kiến gì thêm',
+            listValues: [...(globalTextConfig.listValues || [])]
+          };
+        });
+
+        currentTextRules = imported;
+        return true;
+      }
+
+      if (btnImportFormTextRules) {
+        btnImportFormTextRules.addEventListener('click', () => {
+          const ok = importTextRulesFromForm();
+          if (ok) {
+            renderTextRules();
+            if (scheduleFeedback) {
+              scheduleFeedback.className = 'field-feedback success';
+              scheduleFeedback.textContent = `📥 Đã nạp thành công ${currentTextRules.length} câu tự luận từ Google Form!`;
+              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+            }
+          } else {
+            if (scheduleFeedback) {
+              scheduleFeedback.className = 'field-feedback error';
+              scheduleFeedback.textContent = '⚠️ Không tìm thấy câu hỏi tự luận/văn bản nào trong form hiện tại.';
+              setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 3500);
+            }
+          }
+        });
+      }
+
+      // Quick apply mode & values to ALL text rules
+      if (btnApplyAllTextMode) {
+        btnApplyAllTextMode.addEventListener('click', () => {
+          const selectedRadio = document.querySelector('input[name="global-text-mode"]:checked');
+          const mode = selectedRadio ? selectedRadio.value : 'fixed';
+          const fixedVal = globalFixedInput ? globalFixedInput.value : '';
+          const listVals = globalListTextarea ? globalListTextarea.value.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+          globalTextConfig.mode = mode;
+          globalTextConfig.fixedValue = fixedVal;
+          globalTextConfig.listValues = listVals;
+
+          if (!currentTextRules || currentTextRules.length === 0) {
+            const ok = importTextRulesFromForm();
+            if (!ok) {
+              currentTextRules = [
+                {
+                  id: 'text_rule_sample',
+                  type: 'text',
+                  matchType: 'index',
+                  matchValue: '1',
+                  titleHint: 'Ví dụ: Đóng góp ý kiến',
+                  mode: mode,
+                  fixedValue: fixedVal,
+                  listValues: [...listVals]
+                }
+              ];
+            }
+          }
+
+          // Apply to all items
+          currentTextRules.forEach(rule => {
+            rule.mode = mode;
+            if (mode === 'fixed') rule.fixedValue = fixedVal;
+            if (mode === 'random_list') rule.listValues = [...listVals];
+          });
+
+          renderTextRules();
+
+          if (scheduleFeedback) {
+            const modeName = mode === 'skip' ? 'Bỏ qua (Skip)' : mode === 'fixed' ? 'Điền cố định' : 'Random theo danh sách';
+            scheduleFeedback.className = 'field-feedback success';
+            scheduleFeedback.textContent = `⚡ Đã áp dụng chế độ "${modeName}" cho toàn bộ ${currentTextRules.length} câu tự luận! Bấm "Lưu cấu hình" để lưu lại.`;
+            setTimeout(() => { if (scheduleFeedback) scheduleFeedback.textContent = ''; }, 4000);
+          }
+        });
+      }
+
+      if (btnSaveSchedule) {
+        btnSaveSchedule.addEventListener('click', async () => {
+          const cooldownConfig = {
+            enabled: chkCooldownEnabled ? chkCooldownEnabled.checked : false,
+            min: parseFloat(cooldownMinInput?.value) || 5,
+            max: parseFloat(cooldownMaxInput?.value) || 15,
+            unit: cooldownUnitSelect?.value || 'm',
+            autoSubmit: chkCooldownAutoSubmit ? chkCooldownAutoSubmit.checked : false,
+            autoRestartFill: chkCooldownAutoRestart ? chkCooldownAutoRestart.checked : true
+          };
+
+          await chrome.storage.local.set({
+            formmind_cooldown_config: cooldownConfig,
+            formmind_weighted_rules: currentWeightedRules,
+            formmind_text_rules: currentTextRules,
+            formmind_text_global_default: globalTextConfig
+          });
+
+          if (scheduleFeedback) {
+            scheduleFeedback.className = 'field-feedback success';
+            scheduleFeedback.textContent = '✅ Đã lưu cấu hình Schedule & Rules thành công!';
+            setTimeout(() => {
+              if (scheduleFeedback) scheduleFeedback.textContent = '';
+            }, 3000);
+          }
+        });
+      }
+
+      if (chrome?.storage?.local) {
+        chrome.storage.local.get([
+          'formmind_cooldown_config',
+          'formmind_cooldown_state',
+          'formmind_weighted_rules',
+          'formmind_text_rules',
+          'formmind_text_global_default'
+        ], (res) => {
+          const cfg = res?.formmind_cooldown_config;
+          if (cfg) {
+            if (chkCooldownEnabled) chkCooldownEnabled.checked = !!cfg.enabled;
+            if (cooldownMinInput && cfg.min) cooldownMinInput.value = cfg.min;
+            if (cooldownMaxInput && cfg.max) cooldownMaxInput.value = cfg.max;
+            if (cooldownUnitSelect && cfg.unit) cooldownUnitSelect.value = cfg.unit;
+            if (chkCooldownAutoSubmit) chkCooldownAutoSubmit.checked = !!cfg.autoSubmit;
+            if (chkCooldownAutoRestart) chkCooldownAutoRestart.checked = cfg.autoRestartFill !== false;
+            updateCooldownHint();
+          }
+
+          if (res?.formmind_weighted_rules) {
+            currentWeightedRules = res.formmind_weighted_rules;
+            renderRules();
+          }
+
+          if (res?.formmind_text_rules) {
+            currentTextRules = res.formmind_text_rules;
+            renderTextRules();
+          }
+
+          if (res?.formmind_text_global_default) {
+            globalTextConfig = res.formmind_text_global_default;
+            const targetRadio = document.querySelector(`input[name="global-text-mode"][value="${globalTextConfig.mode}"]`);
+            if (targetRadio) targetRadio.checked = true;
+            if (globalFixedInput && globalTextConfig.fixedValue) globalFixedInput.value = globalTextConfig.fixedValue;
+            if (globalListTextarea && globalTextConfig.listValues) {
+              globalListTextarea.value = Array.isArray(globalTextConfig.listValues) ? globalTextConfig.listValues.join('\n') : globalTextConfig.listValues;
+            }
+            updateGlobalModeUI();
+          }
+
+          checkAndRenderCooldownBanner(res?.formmind_cooldown_state);
+        });
+      }
+    }
+
+    // Listen for storage changes from in-page floating widget and background
     if (chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'sync') {
@@ -1197,6 +2084,32 @@
         }
 
         if (areaName === 'local') {
+          // Two-way sync: Auto Next checkbox
+          if (changes.formmind_auto_next) {
+            const chkAutoAdvance = document.getElementById('chk-auto-advance');
+            if (chkAutoAdvance) {
+              chkAutoAdvance.checked = !!changes.formmind_auto_next.newValue;
+            }
+          }
+
+          // Two-way sync: Form URL input
+          if (changes.formmind_form_url) {
+            const popupFormUrlInput = document.getElementById('popup-form-url');
+            if (popupFormUrlInput && document.activeElement !== popupFormUrlInput) {
+              popupFormUrlInput.value = changes.formmind_form_url.newValue || '';
+            }
+          }
+
+          // Cooldown state changes
+          if (changes.formmind_cooldown_state && typeof globalUpdateScheduleCooldown === 'function') {
+            globalUpdateScheduleCooldown(changes.formmind_cooldown_state.newValue);
+          }
+
+          // Weighted rules changes
+          if (changes.formmind_weighted_rules && typeof globalUpdateWeightedRules === 'function') {
+            globalUpdateWeightedRules(changes.formmind_weighted_rules.newValue || []);
+          }
+
           if (changes.formmind_active_session) {
             const newSession = changes.formmind_active_session.newValue;
             if (newSession && newSession.inProgress) {

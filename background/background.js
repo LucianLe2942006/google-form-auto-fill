@@ -59,8 +59,142 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  if (request.action === 'START_COOLDOWN') {
+    (async () => {
+      try {
+        const { waitMs, endTime, formUrl } = request.payload || {};
+        const safeEndTime = endTime || (Date.now() + (waitMs || 10000));
+        
+        await chrome.storage.local.set({
+          formmind_cooldown_state: {
+            active: true,
+            endTime: safeEndTime,
+            durationMs: waitMs || (safeEndTime - Date.now()),
+            formUrl: formUrl || ''
+          }
+        });
+
+        // Create alarm in service worker for bulletproof wake-up
+        if (chrome?.alarms) {
+          await chrome.alarms.clear('formmind_cooldown_alarm');
+          chrome.alarms.create('formmind_cooldown_alarm', { when: safeEndTime });
+        }
+
+        sendResponse({ success: true, endTime: safeEndTime });
+      } catch (err) {
+        console.error('[FormMind Background] Start cooldown error:', err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (request.action === 'SKIP_COOLDOWN') {
+    (async () => {
+      try {
+        if (chrome?.alarms) {
+          await chrome.alarms.clear('formmind_cooldown_alarm');
+        }
+        await executeCooldownTrigger(sender?.tab?.id);
+        sendResponse({ success: true });
+      } catch (err) {
+        console.error('[FormMind Background] Skip cooldown error:', err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  if (request.action === 'CANCEL_COOLDOWN') {
+    (async () => {
+      try {
+        if (chrome?.alarms) {
+          await chrome.alarms.clear('formmind_cooldown_alarm');
+        }
+        await chrome.storage.local.set({
+          formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 }
+        });
+        sendResponse({ success: true });
+      } catch (err) {
+        console.error('[FormMind Background] Cancel cooldown error:', err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
   return false;
 });
+
+// Cooldown alarm listener
+if (chrome?.alarms) {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === 'formmind_cooldown_alarm') {
+      console.log('[FormMind Background] Cooldown alarm fired! Reloading / redirecting form...');
+      await executeCooldownTrigger();
+    }
+  });
+}
+
+/**
+ * Executes post-cooldown action: navigates to formUrl or reloads Google Forms tab
+ */
+async function executeCooldownTrigger(preferredTabId = null) {
+  try {
+    const data = await chrome.storage.local.get([
+      'formmind_cooldown_state',
+      'formmind_form_url',
+      'formmind_cooldown_config'
+    ]);
+
+    const state = data?.formmind_cooldown_state || {};
+    const formUrl = (data?.formmind_form_url || state?.formUrl || '').trim();
+    const config = data?.formmind_cooldown_config || {};
+
+    // Reset cooldown active state
+    await chrome.storage.local.set({
+      formmind_cooldown_state: { active: false, endTime: 0, durationMs: 0 }
+    });
+
+    // If autoRestartFill is enabled, set flag so next page load starts auto-fill
+    if (config.autoRestartFill !== false) {
+      await chrome.storage.local.set({ formmind_auto_start_next_run: true });
+    }
+
+    let targetTab = null;
+
+    if (preferredTabId) {
+      try {
+        targetTab = await chrome.tabs.get(preferredTabId);
+      } catch (e) {}
+    }
+
+    if (!targetTab) {
+      // Find active tab or any Google Forms / mock form tab
+      const tabs = await chrome.tabs.query({
+        url: ['https://docs.google.com/forms/*', '*://*/*mock-form.html*']
+      });
+      if (tabs.length > 0) {
+        targetTab = tabs.find(t => t.active) || tabs[0];
+      }
+    }
+
+    if (targetTab && targetTab.id) {
+      if (formUrl && formUrl.startsWith('http')) {
+        console.log(`[FormMind Background] Redirecting tab #${targetTab.id} to Form URL: ${formUrl}`);
+        chrome.tabs.update(targetTab.id, { url: formUrl });
+      } else {
+        console.log(`[FormMind Background] Reloading tab #${targetTab.id}`);
+        chrome.tabs.reload(targetTab.id);
+      }
+    } else if (formUrl && formUrl.startsWith('http')) {
+      console.log(`[FormMind Background] Creating new tab with Form URL: ${formUrl}`);
+      chrome.tabs.create({ url: formUrl });
+    }
+  } catch (err) {
+    console.error('[FormMind Background] Error executing cooldown action:', err);
+  }
+}
 
 /**
  * Handle form answers generation with chosen AI model

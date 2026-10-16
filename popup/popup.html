@@ -32,6 +32,10 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 2-2 2.5h3L11 10h4L9 22l2-7H8l3-13z"/></svg>
             <span>Fill</span>
           </button>
+          <button class="tab-btn" data-tab="tab-schedule" id="nav-schedule-btn" title="Schedule & Weighted Rules">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Schedule</span>
+          </button>
           <button class="tab-btn" data-tab="tab-inspect" id="nav-inspect-btn" title="Inspect Form Questions">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>Inspect</span>
@@ -46,6 +50,21 @@
 
     <!-- Tab 1: Quick Auto-Fill -->
     <main class="tab-content active" id="tab-fill">
+      <!-- Form URL Input Card (Two-way sync with Floating Bar) -->
+      <section class="form-url-card" id="form-url-card">
+        <div class="field-header">
+          <label for="popup-form-url" class="field-label-sm">
+            <span>🔗 Link Form (URL)</span>
+          </label>
+          <button type="button" id="btn-get-current-url" class="btn-text-action" title="Tự động lấy URL của tab hiện tại">
+            <span>🎯 Lấy URL tab này</span>
+          </button>
+        </div>
+        <div class="input-with-actions">
+          <input type="text" id="popup-form-url" placeholder="https://docs.google.com/forms/d/e/.../viewform" class="styled-input" style="font-size: 11.5px;">
+        </div>
+      </section>
+
       <!-- Active Form Status Card -->
       <section class="form-status-card" id="form-status-card">
         <div class="status-indicator-dot" id="status-dot"></div>
@@ -184,7 +203,7 @@
         </button>
         <div class="auto-advance-option" style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;">
           <label style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-secondary); cursor: pointer; user-select: none;">
-            <input type="checkbox" id="chk-auto-advance" checked style="accent-color: var(--primary); cursor: pointer; width: 14px; height: 14px;">
+            <input type="checkbox" id="chk-auto-advance" style="accent-color: var(--primary); cursor: pointer; width: 14px; height: 14px;">
             <span>Tự động chuyển trang (Multi-page forms)</span>
           </label>
         </div>
@@ -199,7 +218,197 @@
       </div>
     </main>
 
-    <!-- Tab 2: Form Inspector -->
+    <!-- Tab 2: Schedule & Automation -->
+    <section class="tab-content" id="tab-schedule">
+      <!-- Active Cooldown Running Banner (Hidden when inactive) -->
+      <div id="popup-cooldown-banner" class="cooldown-active-banner" style="display: none;">
+        <div class="cooldown-banner-header">
+          <div class="cooldown-banner-title">
+            <span class="pulse-dot"></span>
+            <span>Đang đếm ngược Cooldown</span>
+          </div>
+          <span class="cooldown-banner-clock" id="popup-cooldown-timer">00:00:00</span>
+        </div>
+        <p class="cooldown-banner-sub" id="popup-cooldown-sub">Tự động làm mới trang và chạy lượt tiếp theo khi hết giờ.</p>
+        <div class="cooldown-banner-actions">
+          <button type="button" id="btn-popup-skip-cooldown" class="btn-sm-action primary">⚡ Chạy ngay (Bỏ qua chờ)</button>
+          <button type="button" id="btn-popup-cancel-cooldown" class="btn-sm-action danger">⏹️ Dừng Cooldown</button>
+        </div>
+      </div>
+
+      <!-- Module A: Cooldown Loop Settings -->
+      <div class="schedule-card">
+        <div class="schedule-card-header">
+          <div class="schedule-title-group">
+            <div class="schedule-icon">⏱️</div>
+            <div>
+              <h3 class="schedule-title">Cooldown Loop & Tự động lặp lại</h3>
+              <p class="schedule-desc">Chỉ đếm ngược sau khi đã điền xong toàn bộ form (không ngắt quãng giữa các câu).</p>
+            </div>
+          </div>
+          <label class="toggle-switch" title="Bật/Tắt Cooldown Loop">
+            <input type="checkbox" id="chk-cooldown-enabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="schedule-body" id="cooldown-controls-body">
+          <div class="cooldown-time-row">
+            <div class="time-field-col">
+              <label for="cooldown-min-val" class="field-label-sm">Tối thiểu (Min):</label>
+              <input type="number" id="cooldown-min-val" min="1" step="0.5" value="5" class="styled-input-sm">
+            </div>
+            <div class="time-sep">đến</div>
+            <div class="time-field-col">
+              <label for="cooldown-max-val" class="field-label-sm">Tối đa (Max):</label>
+              <input type="number" id="cooldown-max-val" min="1" step="0.5" value="15" class="styled-input-sm">
+            </div>
+            <div class="time-field-col" style="flex: 1.2;">
+              <label for="cooldown-unit-select" class="field-label-sm">Đơn vị:</label>
+              <select id="cooldown-unit-select" class="styled-select-sm">
+                <option value="s">Giây (s)</option>
+                <option value="m" selected>Phút (m)</option>
+                <option value="h">Tiếng (h)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="schedule-options-list">
+            <label class="checkbox-row-sm" title="Tự động bấm nút Gửi/Submit khi điền xong trang cuối cùng">
+              <input type="checkbox" id="chk-cooldown-auto-submit">
+              <span>Tự động bấm <strong>Gửi (Submit)</strong> khi điền xong trang cuối</span>
+            </label>
+            <label class="checkbox-row-sm" title="Tự động bắt đầu điền lượt mới khi hoàn thành Cooldown">
+              <input type="checkbox" id="chk-cooldown-auto-restart" checked>
+              <span>Tự động điền tiếp lượt mới sau khi tải lại trang</span>
+            </label>
+          </div>
+
+          <div class="schedule-hint-box" id="cooldown-preview-hint">
+            💡 <em>Mỗi lượt điền sẽ chờ ngẫu nhiên từ 5 phút đến 15 phút trước khi tải lại form.</em>
+          </div>
+        </div>
+      </div>
+
+      <!-- Module B: Weighted Random Answer Rules -->
+      <div class="schedule-card" style="margin-top: 14px;">
+        <div class="schedule-card-header">
+          <div class="schedule-title-group">
+            <div class="schedule-icon">🎯</div>
+            <div>
+              <h3 class="schedule-title">Tỉ lệ chọn đáp án (Weighted Random)</h3>
+              <p class="schedule-desc">Can thiệp xác suất chọn đáp án (A: 50%, B: 30%, C: 20%) theo phân phối tích lũy.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rules Batch Actions Toolbar (Above questions list) -->
+        <div class="rules-toolbar" id="rules-toolbar">
+          <button type="button" id="btn-batch-randomize-rules" class="btn-batch-randomize" title="Tự động phân bổ ngẫu nhiên tỉ lệ 100% độc lập cho toàn bộ các câu hỏi bằng 1 click">
+            <span class="btn-dice">🎲</span>
+            <span class="btn-text">Random tất cả tỉ lệ</span>
+          </button>
+          <div class="rules-toolbar-actions">
+            <button type="button" id="btn-import-form-rules" class="btn-toolbar-action" title="Tự động nạp toàn bộ câu hỏi từ Google Form hiện tại">
+              <span>📥 Nạp từ Form</span>
+            </button>
+            <button type="button" id="btn-add-weighted-rule" class="btn-toolbar-action add" title="Thêm quy tắc câu hỏi mới">
+              <span>+ Thêm câu</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="rules-container" id="weighted-rules-container">
+          <!-- Dynamic rule cards rendered via JavaScript -->
+        </div>
+
+        <div id="rules-empty-state" class="rules-empty-state">
+          <p>Chưa có quy tắc nào. Bấm <strong>🎲 Random tất cả tỉ lệ</strong> hoặc <strong>📥 Nạp từ Form</strong> để tạo danh sách câu hỏi tự động.</p>
+        </div>
+      </div>
+
+      <!-- Module C: Text & Essay Input Questions Rules -->
+      <div class="schedule-card" style="margin-top: 14px;" id="text-rules-module">
+        <div class="schedule-card-header">
+          <div class="schedule-title-group">
+            <div class="schedule-icon">✍️</div>
+            <div>
+              <h3 class="schedule-title">Câu hỏi tự luận & nhập chữ (Text / Textarea)</h3>
+              <p class="schedule-desc">Cấu hình chế độ điền câu tự luận: Bỏ qua (Skip), Điền cố định, hoặc Random từ danh sách.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Apply All Section (Áp dụng chế độ này cho toàn bộ câu tự điền) -->
+        <div class="text-global-apply-box">
+          <div class="text-global-header">
+            <span class="text-global-label">⚡ Chế độ chung cho tất cả câu tự luận:</span>
+            <button type="button" id="btn-apply-all-text-mode" class="btn-sm-action primary" title="Áp dụng chế độ và nội dung này cho toàn bộ câu tự luận bên dưới">
+              <span>Áp dụng cho toàn bộ</span>
+            </button>
+          </div>
+          <div class="text-global-controls">
+            <div class="mode-selector-row">
+              <label class="mode-radio-label">
+                <input type="radio" name="global-text-mode" value="skip">
+                <span>🚫 Bỏ qua (Skip)</span>
+              </label>
+              <label class="mode-radio-label">
+                <input type="radio" name="global-text-mode" value="fixed" checked>
+                <span>📌 Điền cố định</span>
+              </label>
+              <label class="mode-radio-label">
+                <input type="radio" name="global-text-mode" value="random_list">
+                <span>🎲 Random theo danh sách</span>
+              </label>
+            </div>
+            <!-- Fixed input container -->
+            <div id="global-fixed-container" class="text-mode-input-container">
+              <input type="text" id="global-fixed-input" placeholder="Ví dụ: Không có ý kiến gì thêm" class="styled-input-sm" value="Không có ý kiến gì thêm">
+            </div>
+            <!-- Random list container -->
+            <div id="global-list-container" class="text-mode-input-container" style="display: none;">
+              <textarea id="global-list-textarea" class="styled-textarea-sm" rows="3" placeholder="Nhập mỗi đáp án trên 1 dòng...">Dịch vụ rất tốt, nhân viên nhiệt tình
+Sản phẩm dùng ổn trong tầm giá
+Cần cải thiện tốc độ giao hàng
+Rất hài lòng với trải nghiệm lần này</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar for Text Rules -->
+        <div class="rules-toolbar" style="margin-top: 10px;">
+          <span style="font-size: 11.5px; font-weight: 600; color: #cbd5e1;">Danh sách câu tự luận cụ thể:</span>
+          <div class="rules-toolbar-actions">
+            <button type="button" id="btn-import-form-text-rules" class="btn-toolbar-action" title="Tự động nạp các câu hỏi tự luận từ Form hiện tại">
+              <span>📥 Nạp câu tự luận từ Form</span>
+            </button>
+            <button type="button" id="btn-add-text-rule" class="btn-toolbar-action add" title="Thêm một câu hỏi tự luận mới">
+              <span>+ Thêm câu</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Container for specific text rules -->
+        <div class="rules-container" id="text-rules-container">
+          <!-- Rendered via JavaScript -->
+        </div>
+
+        <div id="text-rules-empty-state" class="rules-empty-state" style="margin-top: 8px;">
+          <p>Chưa có câu tự luận nào. Bấm <strong>📥 Nạp câu tự luận từ Form</strong> hoặc <strong>+ Thêm câu</strong> để cấu hình.</p>
+        </div>
+      </div>
+
+      <!-- Save Schedule Button & Feedback -->
+      <div class="schedule-save-row" style="margin-top: 14px;">
+        <button type="button" id="btn-save-schedule" class="btn-save" style="margin-top: 0;">
+          <span>💾 Lưu cấu hình Schedule & Rules</span>
+        </button>
+        <span class="field-feedback" id="schedule-feedback" style="display: block; text-align: center; margin-top: 6px;"></span>
+      </div>
+    </section>
+
+    <!-- Tab 3: Form Inspector -->
     <section class="tab-content" id="tab-inspect">
       <div class="section-header">
         <label class="section-title">Detected Questions</label>

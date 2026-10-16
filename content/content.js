@@ -34,6 +34,396 @@
     createFloatingWidget();
     setupMessageListeners();
     checkAndResumeActiveSession();
+    checkAndHandleCooldownOrAutoStart();
+  }
+
+  // --- AUTOMATION & SCHEDULE HELPERS ---
+
+  /**
+   * Helper to parse time strings like 10, 1.5 with units 's', 'm', 'h' to milliseconds
+   */
+  function parseTimeToMs(value, unit = 'm') {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return 0;
+    switch (unit) {
+      case 's': return Math.round(num * 1000);
+      case 'm': return Math.round(num * 60 * 1000);
+      case 'h': return Math.round(num * 3600 * 1000);
+      default: return Math.round(num * 60 * 1000);
+    }
+  }
+
+  /**
+   * Format milliseconds into HH:mm:ss or mm:ss
+   */
+  function formatMsToTime(ms) {
+    if (!ms || ms <= 0) return '00:00:00';
+    const totalSecs = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(totalSecs / 3600);
+    const minutes = Math.floor((totalSecs % 3600) / 60);
+    const seconds = totalSecs % 60;
+    const pad = n => String(n).padStart(2, '0');
+    if (hours > 0) {
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  /**
+   * Check if current page is the submission confirmation page
+   */
+  function isFormCompleted() {
+    const href = window.location.href;
+    if (href.includes('/formResponse') || href.includes('/alreadyResponsive')) {
+      return true;
+    }
+    const confirmSelectors = [
+      '.freebirdFormviewerViewResponseConfirmationMessage',
+      '.v1NhUc',
+      'div[role="heading"][aria-level="1"]',
+      '.F9yp7e'
+    ];
+    for (const sel of confirmSelectors) {
+      const el = document.querySelector(sel);
+      if (el && isElementVisible(el)) {
+        const t = el.innerText.toLowerCase();
+        if (
+          t.includes('đã được ghi lại') ||
+          t.includes('response has been recorded') ||
+          t.includes('gửi phản hồi khác') ||
+          t.includes('submit another response')
+        ) {
+          return true;
+        }
+      }
+    }
+    const anotherLink = document.querySelector('a[href*="viewform"], a[href*="formResponse"]');
+    if (anotherLink && isElementVisible(anotherLink)) {
+      const t = anotherLink.innerText.toLowerCase();
+      if (t.includes('gửi câu trả lời khác') || t.includes('submit another response')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Weighted random selection (Cumulative Distribution Function)
+   * options: Array of { label: string, weight: number }
+   */
+  function weightedRandom(options) {
+    if (!options || !Array.isArray(options) || options.length === 0) return null;
+    const valid = options.filter(o => typeof o.weight === 'number' && o.weight > 0);
+    if (valid.length === 0) {
+      return options[Math.floor(Math.random() * options.length)];
+    }
+    const totalWeight = valid.reduce((sum, o) => sum + o.weight, 0);
+    let random = Math.random() * totalWeight;
+    for (const opt of valid) {
+      if (random < opt.weight) {
+        return opt;
+      }
+      random -= opt.weight;
+    }
+    return valid[valid.length - 1];
+  }
+
+  /**
+   * Evaluate if a question matches any rule in weightedRules, and return the chosen answer value
+   */
+  function evaluateWeightedRule(question, questionIndex, rules) {
+    if (!rules || !Array.isArray(rules) || rules.length === 0) return null;
+    const qTitle = (question.title || '').toLowerCase().trim();
+    const qIdx = questionIndex + 1; // 1-based index
+
+    const matchedRule = rules.find(rule => {
+      if (rule.matchType === 'index') {
+        const ruleIdx = parseInt(rule.matchValue, 10);
+        return !isNaN(ruleIdx) && ruleIdx === qIdx;
+      }
+      if (rule.matchType === 'title' || !rule.matchType) {
+        const kw = (rule.matchValue || '').toLowerCase().trim();
+        if (!kw) return false;
+        try {
+          const re = new RegExp(kw, 'i');
+          if (re.test(qTitle)) return true;
+        } catch (e) {}
+        return qTitle.includes(kw);
+      }
+      return false;
+    });
+
+    if (!matchedRule || !matchedRule.options || matchedRule.options.length === 0) {
+      return null;
+    }
+
+    const picked = weightedRandom(matchedRule.options);
+    if (!picked) return null;
+
+    const targetLabel = (picked.label || '').toLowerCase().trim();
+    const availableOptions = question.options || [];
+
+    if (availableOptions.length > 0) {
+      let exact = availableOptions.find(o => o.toLowerCase().trim() === targetLabel);
+      if (exact) return exact;
+
+      let sub = availableOptions.find(o => 
+        o.toLowerCase().trim().includes(targetLabel) || targetLabel.includes(o.toLowerCase().trim())
+      );
+      if (sub) return sub;
+
+      const letterMatch = picked.label.match(/^[A-Z]$/i);
+      if (letterMatch) {
+        const charIdx = letterMatch[0].toUpperCase().charCodeAt(0) - 65;
+        if (charIdx >= 0 && charIdx < availableOptions.length) {
+          return availableOptions[charIdx];
+        }
+      }
+      const numIdx = parseInt(picked.label, 10);
+      if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= availableOptions.length) {
+        return availableOptions[numIdx - 1];
+      }
+    }
+
+    return picked.label;
+  }
+
+  /**
+   * Evaluate if a text/textarea question matches a text rule or global default
+   * @param {Object} question The scanned question object
+   * @param {number} questionIndex 0-based index
+   * @param {Array} textRules Array of configured text rules
+   * @param {Object} globalDefault Optional global default text config
+   * @returns {Object|null} { action: 'skip'|'fill', value: string } or null
+   */
+  function evaluateTextRule(question, questionIndex, textRules, globalDefault) {
+    if (!question || (question.type !== 'text' && question.type !== 'textarea')) {
+      return null;
+    }
+
+    const qTitle = (question.title || '').toLowerCase().trim();
+    const qIdx = questionIndex + 1; // 1-based index
+
+    let matchedRule = null;
+    if (Array.isArray(textRules) && textRules.length > 0) {
+      matchedRule = textRules.find(rule => {
+        if (rule.matchType === 'index') {
+          const ruleIdx = parseInt(rule.matchValue, 10);
+          return !isNaN(ruleIdx) && ruleIdx === qIdx;
+        }
+        if (rule.matchType === 'title' || !rule.matchType) {
+          const kw = (rule.matchValue || '').toLowerCase().trim();
+          if (!kw) return false;
+          try {
+            const re = new RegExp(kw, 'i');
+            if (re.test(qTitle)) return true;
+          } catch (e) {}
+          return qTitle.includes(kw);
+        }
+        return false;
+      });
+    }
+
+    const ruleToApply = matchedRule || (globalDefault && globalDefault.enabled ? globalDefault : null);
+    if (!ruleToApply) return null;
+
+    const mode = ruleToApply.mode || 'fixed';
+
+    if (mode === 'skip') {
+      return { action: 'skip', value: '' };
+    }
+
+    if (mode === 'fixed') {
+      return { action: 'fill', value: ruleToApply.fixedValue || '' };
+    }
+
+    if (mode === 'random_list') {
+      let list = [];
+      if (Array.isArray(ruleToApply.listValues)) {
+        list = ruleToApply.listValues;
+      } else if (typeof ruleToApply.listValues === 'string') {
+        list = ruleToApply.listValues.split('\n').map(s => s.trim()).filter(Boolean);
+      }
+      if (list.length > 0) {
+        const chosenText = list[Math.floor(Math.random() * list.length)];
+        return { action: 'fill', value: chosenText };
+      }
+      return { action: 'fill', value: ruleToApply.fixedValue || '' };
+    }
+
+    return null;
+  }
+
+  // --- COOLDOWN LOOP CONTROLLER ---
+  let cooldownInterval = null;
+
+  async function startCooldown(config) {
+    if (!config || !config.enabled) return;
+    const minMs = parseTimeToMs(config.min || 5, config.unit || 'm');
+    const maxMs = parseTimeToMs(config.max || 10, config.unit || 'm');
+    const safeMin = Math.min(minMs, maxMs);
+    const safeMax = Math.max(minMs, maxMs);
+    const waitMs = safeMin + Math.floor(Math.random() * (safeMax - safeMin + 1));
+    const endTime = Date.now() + waitMs;
+
+    const localData = await new Promise(r => chrome.storage.local.get(['formmind_form_url'], r));
+    const formUrl = (localData?.formmind_form_url || '').trim();
+
+    sendSafeRuntimeMessage({
+      action: 'START_COOLDOWN',
+      payload: { waitMs, endTime, formUrl }
+    });
+
+    renderCooldownBar(endTime);
+    showToast(`⏳ Đã hoàn thành form! Bắt đầu đếm ngược Cooldown ${formatMsToTime(waitMs)}...`, 'info');
+  }
+
+  function renderCooldownBar(endTime) {
+    if (cooldownInterval) clearInterval(cooldownInterval);
+
+    let widget = document.getElementById('formmind-floating-widget');
+    if (!widget) {
+      createFloatingWidget();
+      widget = document.getElementById('formmind-floating-widget');
+    }
+    if (!widget) return;
+
+    let bar = widget.querySelector('#fmind-cooldown-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'fmind-cooldown-bar';
+      bar.id = 'fmind-cooldown-bar';
+      bar.innerHTML = `
+        <div class="fmind-cooldown-info">
+          <span>⏳</span>
+          <span>Chờ:</span>
+          <span class="fmind-cooldown-timer" id="fmind-cooldown-timer">00:00:00</span>
+        </div>
+        <button type="button" class="fmind-btn-skip" id="fmind-btn-skip-cooldown" title="Bỏ qua thời gian chờ và chạy ngay">
+          ⚡ Chạy ngay
+        </button>
+      `;
+      widget.prepend(bar);
+
+      const skipBtn = bar.querySelector('#fmind-btn-skip-cooldown');
+      if (skipBtn) {
+        skipBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          skipCooldown();
+        });
+      }
+    }
+
+    bar.style.display = 'flex';
+
+    const updateTimer = () => {
+      const remaining = endTime - Date.now();
+      const timerEl = document.getElementById('fmind-cooldown-timer');
+      if (remaining <= 0) {
+        if (cooldownInterval) clearInterval(cooldownInterval);
+        removeCooldownBar();
+        handleCooldownFinished();
+      } else if (timerEl) {
+        timerEl.textContent = formatMsToTime(remaining);
+      }
+    };
+
+    updateTimer();
+    cooldownInterval = setInterval(updateTimer, 500);
+  }
+
+  function removeCooldownBar() {
+    if (cooldownInterval) clearInterval(cooldownInterval);
+    cooldownInterval = null;
+    const bar = document.getElementById('fmind-cooldown-bar');
+    if (bar) bar.remove();
+  }
+
+  async function skipCooldown() {
+    if (cooldownInterval) clearInterval(cooldownInterval);
+    cooldownInterval = null;
+    removeCooldownBar();
+
+    showToast('⚡ Đang bỏ qua Cooldown và bắt đầu lượt mới...', 'info');
+
+    sendSafeRuntimeMessage({ action: 'SKIP_COOLDOWN' });
+
+    const res = await new Promise(r => chrome.storage.local.get(['formmind_form_url', 'formmind_cooldown_config'], r));
+    const formUrl = (res?.formmind_form_url || '').trim();
+    if (res?.formmind_cooldown_config?.autoRestartFill !== false) {
+      await chrome.storage.local.set({ formmind_auto_start_next_run: true });
+    }
+
+    setTimeout(() => {
+      if (formUrl && formUrl.startsWith('http')) {
+        window.location.href = formUrl;
+      } else {
+        window.location.reload();
+      }
+    }, 350);
+  }
+
+  async function handleCooldownFinished() {
+    const res = await new Promise(r => chrome.storage.local.get(['formmind_form_url', 'formmind_cooldown_config'], r));
+    const formUrl = (res?.formmind_form_url || '').trim();
+    if (res?.formmind_cooldown_config?.autoRestartFill !== false) {
+      await chrome.storage.local.set({ formmind_auto_start_next_run: true });
+    }
+    if (formUrl && formUrl.startsWith('http')) {
+      window.location.href = formUrl;
+    } else {
+      window.location.reload();
+    }
+  }
+
+  async function checkAndHandleCooldownOrAutoStart() {
+    try {
+      const local = await new Promise(r => chrome.storage.local.get([
+        'formmind_cooldown_state',
+        'formmind_cooldown_config',
+        'formmind_auto_start_next_run'
+      ], r));
+
+      const cooldownState = local?.formmind_cooldown_state;
+      const cooldownConfig = local?.formmind_cooldown_config;
+      const autoStart = local?.formmind_auto_start_next_run;
+
+      // 1. If currently in cooldown, render countdown timer
+      if (cooldownState && cooldownState.active && cooldownState.endTime > Date.now()) {
+        renderCooldownBar(cooldownState.endTime);
+        return;
+      }
+
+      // 2. If on form completion page and cooldown is enabled, trigger cooldown
+      if (isFormCompleted()) {
+        if (cooldownConfig && cooldownConfig.enabled) {
+          startCooldown(cooldownConfig);
+        }
+        return;
+      }
+
+      // 3. If returning from cooldown with auto-start enabled, automatically start filling
+      if (autoStart) {
+        await chrome.storage.local.remove('formmind_auto_start_next_run');
+        showToast('🚀 Bắt đầu lượt điền tự động mới sau Cooldown...', 'info');
+        const pageResult = await waitForQuestionsOnPage(8000);
+        if (pageResult.success && pageResult.questions?.length > 0) {
+          const fillBtn = document.getElementById('fmind-quick-fill-btn');
+          const personaSelect = document.getElementById('fmind-quick-persona');
+          const modelSelect = document.getElementById('fmind-quick-model');
+          if (fillBtn) {
+            handleFloatingAutoFill(
+              fillBtn,
+              personaSelect ? personaSelect.value : 'positive',
+              modelSelect ? modelSelect.value : ''
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[FormMind] checkAndHandleCooldownOrAutoStart error:', e);
+    }
   }
 
   /**
@@ -169,7 +559,7 @@
           chosenProvider: payload.provider || 'gemini',
           apiKey: payload.apiKey,
           customPersonaPrompt: payload.customPersonaPrompt || '',
-          autoAdvance: payload.autoAdvance !== false,
+          autoAdvance: payload.autoAdvance === true,
           onProgress: (progressInfo) => {
             sendSafeRuntimeMessage({
               action: 'FORMMIND_PAGE_PROGRESS',
@@ -617,11 +1007,19 @@
       const input = controls.input;
       if (!input) return false;
 
+      // Skip mode: leave blank and do not fill
+      if (value === '__FORMMIND_SKIP__') {
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+        return true;
+      }
+
       const textValue = String(value || '');
       input.focus();
       input.value = textValue;
 
-      // Dispatch full suite of events for Google Forms Closure/React state binding
+      // Dispatch full suite of events for Google Forms Closure/React/Vue state binding
       input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
       input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
       input.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
@@ -1093,6 +1491,11 @@
           <option value="neutral">⚖️ Balanced</option>
           <option value="custom">🎨 Custom</option>
         </select>
+        <label class="fmind-checkbox-label" title="Tự động chuyển tiếp trang khi điền xong (Mặc định: TẮT)">
+          <input type="checkbox" id="fmind-auto-next" class="fmind-checkbox">
+          <span>Auto Next</span>
+        </label>
+        <input type="text" id="fmind-form-url" class="fmind-input-url" placeholder="🔗 Link Form..." title="Dán URL của Form gốc để lặp lại sau Cooldown">
         <button type="button" class="fmind-btn-fill" id="fmind-quick-fill-btn" title="Bấm để tự động điền form ngay lập tức">
           <span>⚡ Auto-Fill</span>
         </button>
@@ -1106,25 +1509,64 @@
     const modelSelect = widget.querySelector('#fmind-quick-model');
     const personaSelect = widget.querySelector('#fmind-quick-persona');
     const badge = widget.querySelector('#fmind-badge');
+    const autoNextCheckbox = widget.querySelector('#fmind-auto-next');
+    const formUrlInput = widget.querySelector('#fmind-form-url');
 
     if (badge) {
       badge.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        showToast('✨ FormMind AI Form Filler sẵn sàng! Chọn Model và Persona rồi bấm Auto-Fill.', 'info');
+        showToast('✨ FormMind sẵn sàng! Chọn Model, Persona, bật/tắt Auto Next và Link Form rồi bấm Auto-Fill.', 'info');
       });
     }
 
-    // Load saved preferences with safe helper
+    // Load saved preferences from sync and local storage
     getSyncStorage(['defaultPersona', 'selectedModel']).then((syncRes) => {
-      chrome.storage.local.get(['syncedModelsDev'], (localRes) => {
+      chrome.storage.local.get(['syncedModelsDev', 'formmind_auto_next', 'formmind_form_url', 'formmind_cooldown_state'], (localRes) => {
         if (syncRes && syncRes.defaultPersona && personaSelect) {
           personaSelect.value = syncRes.defaultPersona;
         }
         const activeModel = (syncRes && syncRes.selectedModel) || 'gemini:gemini-3.8-flash';
         populateFloatingModels(modelSelect, localRes ? localRes.syncedModelsDev : null, activeModel);
+
+        // Auto Next: default is OFF (unchecked) per specifications
+        if (autoNextCheckbox) {
+          autoNextCheckbox.checked = !!(localRes && localRes.formmind_auto_next);
+        }
+
+        // Form URL input
+        if (formUrlInput && localRes && localRes.formmind_form_url) {
+          formUrlInput.value = localRes.formmind_form_url;
+        }
+
+        // Check if cooldown is currently active
+        const cdState = localRes?.formmind_cooldown_state;
+        if (cdState && cdState.active && cdState.endTime > Date.now()) {
+          renderCooldownBar(cdState.endTime);
+        }
       });
     });
+
+    // Save Auto Next checkbox changes to chrome.storage.local (Two-way sync)
+    if (autoNextCheckbox) {
+      autoNextCheckbox.addEventListener('change', () => {
+        chrome.storage.local.set({ formmind_auto_next: autoNextCheckbox.checked });
+      });
+    }
+
+    // Save Form URL with debounce and on blur (Two-way sync)
+    let urlDebounceTimer = null;
+    if (formUrlInput) {
+      formUrlInput.addEventListener('input', () => {
+        clearTimeout(urlDebounceTimer);
+        urlDebounceTimer = setTimeout(() => {
+          chrome.storage.local.set({ formmind_form_url: formUrlInput.value.trim() });
+        }, 350);
+      });
+      formUrlInput.addEventListener('blur', () => {
+        chrome.storage.local.set({ formmind_form_url: formUrlInput.value.trim() });
+      });
+    }
 
     // Save persona on change
     personaSelect.addEventListener('change', () => {
@@ -1149,7 +1591,7 @@
       }
     });
 
-    // Real-time synchronization when user changes model or persona in extension popup
+    // Real-time two-way synchronization with extension popup and storage changes
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'sync') {
         if (changes.defaultPersona && personaSelect) {
@@ -1169,8 +1611,29 @@
           }
         }
       }
-      if (areaName === 'local' && changes.syncedModelsDev && modelSelect) {
-        populateFloatingModels(modelSelect, changes.syncedModelsDev.newValue, modelSelect.value);
+      if (areaName === 'local') {
+        if (changes.syncedModelsDev && modelSelect) {
+          populateFloatingModels(modelSelect, changes.syncedModelsDev.newValue, modelSelect.value);
+        }
+        // Two-way sync: Auto Next checkbox
+        if (changes.formmind_auto_next && autoNextCheckbox) {
+          autoNextCheckbox.checked = !!changes.formmind_auto_next.newValue;
+        }
+        // Two-way sync: Form URL input
+        if (changes.formmind_form_url && formUrlInput) {
+          if (document.activeElement !== formUrlInput) {
+            formUrlInput.value = changes.formmind_form_url.newValue || '';
+          }
+        }
+        // Cooldown state updates
+        if (changes.formmind_cooldown_state) {
+          const state = changes.formmind_cooldown_state.newValue;
+          if (state && state.active && state.endTime > Date.now()) {
+            renderCooldownBar(state.endTime);
+          } else {
+            removeCooldownBar();
+          }
+        }
       }
     });
 
@@ -1438,7 +1901,56 @@
         return { success: false, error: msg };
       }
 
-      // 3. Apply answers to DOM with constraint guarantees
+      // 3. Apply Weighted Random Rules & Text Question Rules (take priority over AI answers)
+      try {
+        const rulesData = await new Promise(r => chrome.storage.local.get([
+          'formmind_weighted_rules',
+          'formmind_text_rules',
+          'formmind_text_global_default'
+        ], r));
+
+        const weightedRules = rulesData?.formmind_weighted_rules || [];
+        const textRules = rulesData?.formmind_text_rules || [];
+        const textGlobalDefault = rulesData?.formmind_text_global_default || null;
+
+        if (Array.isArray(aiResult)) {
+          questions.forEach((q, idx) => {
+            // A. Check Text/Textarea question rules
+            if (q.type === 'text' || q.type === 'textarea') {
+              const textRuleRes = evaluateTextRule(q, idx, textRules, textGlobalDefault);
+              if (textRuleRes) {
+                console.log(`[FormMind Text Rule] Matched for Q#${q.id} ("${q.title}") -> Action:`, textRuleRes);
+                const finalVal = textRuleRes.action === 'skip' ? '__FORMMIND_SKIP__' : textRuleRes.value;
+                const existing = aiResult.find(a => a.id === q.id);
+                if (existing) {
+                  existing.value = finalVal;
+                } else {
+                  aiResult.push({ id: q.id, value: finalVal });
+                }
+                return;
+              }
+            }
+
+            // B. Check Multiple Choice weighted rules
+            if (weightedRules.length > 0) {
+              const weightedVal = evaluateWeightedRule(q, idx, weightedRules);
+              if (weightedVal !== null && weightedVal !== undefined) {
+                console.log(`[FormMind Weighted Random] Matched rule for Q#${q.id} ("${q.title}") -> Selected:`, weightedVal);
+                const existing = aiResult.find(a => a.id === q.id);
+                if (existing) {
+                  existing.value = weightedVal;
+                } else {
+                  aiResult.push({ id: q.id, value: weightedVal });
+                }
+              }
+            }
+          });
+        }
+      } catch (ruleErr) {
+        console.warn('[FormMind] Error applying weighted/text rules:', ruleErr);
+      }
+
+      // Apply answers to DOM with constraint guarantees
       const fillResult = await applyAnswersToForm(aiResult);
       totalFilledAcrossAllPages += fillResult.count;
 
@@ -1461,15 +1973,35 @@
       // If no Next button exists or user disabled autoAdvance, stop here
       if (!nextBtn || !autoAdvance) {
         chrome.storage.local.remove('formmind_active_session');
-        if (submitBtn) {
-          submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
         const finishMsg = pageNumber > 1
-          ? `✨ Đã tự động điền xong ${pageNumber} trang (${totalFilledAcrossAllPages} câu)! Vui lòng kiểm tra lại trước khi bấm Gửi.`
-          : `✨ Đã tự động điền ${totalFilledAcrossAllPages}/${questions.length} câu hỏi! Vui lòng kiểm tra lại trước khi bấm Gửi.`;
+          ? `✨ Đã tự động điền xong ${pageNumber} trang (${totalFilledAcrossAllPages} câu)!`
+          : `✨ Đã tự động điền ${totalFilledAcrossAllPages}/${questions.length} câu hỏi!`;
         
         showToast(finishMsg, 'success');
         if (onProgress) onProgress({ status: 'completed', page: pageNumber, totalFilled: totalFilledAcrossAllPages, message: finishMsg });
+
+        // Trigger Cooldown Loop ONLY after form is completed (no Next button left or submission page)
+        const isFormEnded = !nextBtn || isFormCompleted();
+        if (isFormEnded) {
+          try {
+            const cdData = await new Promise(r => chrome.storage.local.get(['formmind_cooldown_config'], r));
+            const cdConfig = cdData?.formmind_cooldown_config;
+            if (cdConfig && cdConfig.enabled) {
+              if (cdConfig.autoSubmit && submitBtn) {
+                submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showToast('🚀 Tự động gửi form (Auto-Submit)...', 'info');
+                await new Promise(r => setTimeout(r, 600));
+                submitBtn.click();
+              }
+              await startCooldown(cdConfig);
+            } else if (submitBtn) {
+              submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          } catch (cdErr) {
+            console.warn('[FormMind] Cooldown trigger error:', cdErr);
+          }
+        }
+
         return { success: true, count: totalFilledAcrossAllPages, totalPages: pageNumber };
       }
 
@@ -1645,16 +2177,17 @@
         }
       }
 
-      btn.innerHTML = '<span>🤖 AI đang suy nghĩ...</span>';
+      // 3. Start Multi-page Auto-fill engine with autoAdvance from storage (default: false)
+      const localData = await new Promise(r => chrome.storage.local.get(['formmind_auto_next'], r));
+      const autoAdvance = !!localData?.formmind_auto_next;
 
-      // 3. Start Multi-page Auto-fill engine
       await runMultiPageAutoFill({
         selectedPersona: selectedPersona || 'positive',
         chosenModel,
         chosenProvider,
         apiKey,
         customPersonaPrompt: settings.customPersonaPrompt || '',
-        autoAdvance: settings.autoAdvancePages !== false,
+        autoAdvance: autoAdvance,
         onProgress: (p) => {
           if (p.status === 'thinking') {
             btn.innerHTML = `<span>⏳ Trang ${p.page}...</span>`;
