@@ -251,9 +251,3 @@ google-form-auto-fill/
 - **Không sử dụng máy chủ trung gian (Zero Middleman)**: Toàn bộ quá trình gọi API đều diễn ra trực tiếp từ trình duyệt của bạn tới API của Google, Groq, Hugging Face, OpenAI, Anthropic hoặc OpenRouter.
 - **Lưu trữ bảo mật**: API Key được lưu trong bộ nhớ `chrome.storage` an toàn của trình duyệt Chrome, không bao giờ được gửi tới bất kỳ bên thứ ba nào.
 - **Mã nguồn mở 100%**: Toàn bộ mã nguồn minh bạch, người dùng có thể thoải mái kiểm tra và tùy biến theo nhu cầu.
-
----
-
-## 📄 Bản Quyền & Đóng Góp (License & Contributing)
-
-Phát hành theo giấy phép mã nguồn mở **MIT License**. Mọi đóng góp, báo cáo lỗi hoặc đề xuất tính năng đều được hoan nghênh tại [Issues](https://github.com/LucianLe2942006/google-form-auto-fill/issues) và [Pull Requests](https://github.com/LucianLe2942006/google-form-auto-fill/pulls).
