@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FormMind - AI Google Form Auto-Filler",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Auto-fills Google Forms with custom AI personas using Gemini, Groq, Hugging Face, OpenAI, Claude, or OpenRouter.",
   "permissions": [
     "activeTab",

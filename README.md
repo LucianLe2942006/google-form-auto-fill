@@ -1,4 +1,4 @@
-# ⚡ FormMind - AI Google Form Auto-Filler (Chrome Extension) v2.0
+# ⚡ FormMind - AI Google Form Auto-Filler (Chrome Extension) v2.0.1
 
 <p align="center">
   <img src="icons/icon128.png" width="96" height="96" alt="FormMind Logo" />
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/LucianLe2942006/google-form-auto-fill/releases/tag/v2.0"><img src="https://img.shields.io/badge/Release-v2.0.0-success?style=flat-square" alt="Version 2.0.0"></a>
+  <a href="https://github.com/LucianLe2942006/google-form-auto-fill/releases/tag/v2.0.1"><img src="https://img.shields.io/badge/Release-v2.0.1-success?style=flat-square" alt="Version 2.0.1"></a>
   <a href="#-cách-cài-đặt-từng-bước-installation"><img src="https://img.shields.io/badge/Chrome-Manifest_V3-blue?style=flat-square" alt="Manifest V3"></a>
   <a href="#-các-nhà-cung-cấp-ai-hỗ-trợ"><img src="https://img.shields.io/badge/AI_Engine-Gemini_%7C_Groq_%7C_HuggingFace_%7C_OpenAI-orange?style=flat-square" alt="AI Engines"></a>
   <a href="#-bảo-mật--quyền-riêng-tư"><img src="https://img.shields.io/badge/Privacy-Local_Only-green?style=flat-square" alt="Privacy First"></a>
@@ -19,35 +19,40 @@
 
 ---
 
-## 🌟 Có gì mới ở FormMind v2.0? (What's New in v2.0)
+## 🌟 Có gì mới ở FormMind v2.0.1? (What's New in v2.0.1)
 
-FormMind v2.0 là bản nâng cấp toàn diện mang đến khả năng tự động hóa mạnh mẽ nhất từ trước đến nay:
+FormMind v2.0.1 mang đến các bản vá lỗi quan trọng và nâng cấp toàn diện cho luồng tự động hóa biểu mẫu đa trang:
 
-1. **📄 Hỗ trợ Biểu mẫu Đa trang (Multi-page Forms) & Đọc biến ngầm `FB_PUBLIC_LOAD_DATA_`**:
+1. **🔧 Vá triệt để lỗi nhận diện trang hoàn tất & Chống nghẽn Cooldown (v2.0.1 Hotfix)**:
+   - **Chuẩn hóa nhận diện DOM**: Google Forms chuyển URL sang `/formResponse` ngay từ Trang 2 trở đi. Hệ thống đã được nâng cấp để phân biệt chính xác 100% giữa Section trung gian (đang điền) và màn hình xác nhận nộp bài (đã hoàn thành).
+   - **Bộ lọc Gatekeeper bổ sung**: Ngăn chặn hoàn toàn việc nhận diện nhầm khi nút *"Quay lại"* (`.kW9Bec`, `.xK37zc`) hoặc thẻ `<form>` còn tồn tại.
+   - **Xóa bỏ lỗi *"Không tìm thấy câu hỏi hoặc nút chuyển trang"***: Chặn đứng tình trạng `checkAndResumeActiveSession` cố chấp gọi auto-fill trên màn hình kết thúc form.
+   - **Khử Race Condition trước khi Submit**: Đảm bảo dọn dẹp sạch sẽ session cũ, giúp thanh Cooldown đếm ngược tự động kích hoạt mượt mà sau khi nộp form.
+2. **📄 Hỗ trợ Biểu mẫu Đa trang (Multi-page Forms) & Đọc biến ngầm `FB_PUBLIC_LOAD_DATA_`**:
    - Khai thác biến ngầm của Google Forms để trích xuất 100% cấu trúc câu hỏi từ tất cả các Section/Trang ngay từ đầu.
    - Tự động phát hiện và xử lý mượt mà trang giới thiệu / mô tả (0 câu hỏi).
    - Tự động bấm **"Tiếp" (Next)** qua từng trang và nộp form khi đến trang cuối.
-2. **🛡️ Bộ lọc an toàn chống bấm nhầm nút "Quay lại" (Back Button Safety Guard)**:
+3. **🛡️ Bộ lọc an toàn chống bấm nhầm nút "Quay lại" (Back Button Safety Guard)**:
    - Loại trừ triệt để các nút Quay lại trong container `.kW9Bec` / `.xK37zc`.
    - Ưu tiên chính xác 100% vào nút "Gửi" trong container `.lRwqcd`, ngăn ngừa hoàn toàn tình trạng form bị lùi trang thay vì nộp bài.
-3. **⏱️ Tab Schedule & Vòng lặp Cooldown tự động**:
+4. **⏱️ Tab Schedule & Vòng lặp Cooldown tự động**:
    - Tự động nộp form và đếm ngược Cooldown trước khi lặp lại lượt điền tiếp theo.
    - Thanh đếm ngược Cooldown nổi trực quan trên màn hình và trong popup.
    - Nút **"⚡ Chạy ngay" (Skip Cooldown)**: Bỏ qua đếm ngược và chuyển hướng tức thì về form gốc `/viewform` để điền tiếp mà không bị reload lại trang kết quả.
    - Nút **"🛑 Hủy chu kỳ" (Cancel Cooldown)**.
-4. **🎲 Phân bổ Tỉ lệ Tùy chỉnh (Weighted Rules) & Tỉ lệ Độc lập cho Checkbox**:
+5. **🎲 Phân bổ Tỉ lệ Tùy chỉnh (Weighted Rules) & Tỉ lệ Độc lập cho Checkbox**:
    - Tùy chỉnh tỉ lệ phần trăm xuất hiện cho từng đáp án trắc nghiệm.
    - **Câu chọn 1 (Radio, Scale, Dropdown)**: Ràng buộc tổng = 100%, có nút *"⚖️ Tự cân bằng 100%"*.
    - **Câu hỏi Checkbox (Hộp kiểm nhiều đáp án)**: Cho phép mỗi ô nhận tỉ lệ độc lập từ 0% đến 100% (tổng có thể vượt 100% như 150%, 210%), đồng thời tuân thủ chính xác các ràng buộc min/max/exact choices của form.
    - Nút **"📥 Nạp từ Form"**: 1-Click đọc toàn bộ câu hỏi đa trang vào danh sách quy tắc.
    - Nút **"🎲 Random tất cả tỉ lệ"**: 1-Click tự động phân bổ ngẫu nhiên tỉ lệ cho 100% câu hỏi toàn bộ các trang!
-5. **📝 Quy tắc câu hỏi Văn bản (Text Rules) & Tạo Hồ sơ Việt Nam (Profile Faker)**:
+6. **📝 Quy tắc câu hỏi Văn bản (Text Rules) & Tạo Hồ sơ Việt Nam (Profile Faker)**:
    - Hỗ trợ câu hỏi điền văn bản theo 3 chế độ: Cố định (Fixed), Bỏ qua (Skip), hoặc Lấy ngẫu nhiên từ danh sách (Random from list).
    - Tự động tạo và điền thông tin cá nhân chuẩn Việt Nam: Họ tên, Số điện thoại, Email, MSSV, Lớp, Tuổi, Năm sinh, Địa chỉ.
-6. **🎭 Bổ sung Persona "Random" & Cơ chế Grayout / Khóa Tab**:
+7. **🎭 Bổ sung Persona "Random" & Cơ chế Grayout / Khóa Tab**:
    - Bổ sung Persona `random` (Khách quan tự nhiên) cho toàn bộ hệ thống.
    - Cơ chế bảo vệ xung đột (Conflict of interest): Khi chọn Persona khác (`positive`, `negative`,...), Module B tỉ lệ sẽ tự động làm mờ và khóa lại; khi chọn Persona `random`, Module B sẽ mở khóa đầy đủ.
-7. **🛑 Dừng khẩn cấp (Emergency Terminate) & Chế độ Debug Log**:
+8. **🛑 Dừng khẩn cấp (Emergency Terminate) & Chế độ Debug Log**:
    - Nút Terminate dừng ngay lập tức mọi tiến trình, timer và automation mà không reload trang.
    - Switch Debug Mode ghi log chi tiết kèm snapshot DOM và xuất file báo cáo lỗi JSON `formmind_bug_report_<timestamp>.json`.
 
@@ -218,7 +223,7 @@ Danh sách các module kiểm thử:
 
 ```
 google-form-auto-fill/
-├── manifest.json              # Khai báo cấu hình Chrome Extension (Manifest V3 - v2.0.0)
+├── manifest.json              # Khai báo cấu hình Chrome Extension (Manifest V3 - v2.0.1)
 ├── background/
 │   └── background.js          # Service Worker: Gọi API AI, quản lý Cooldown Alarms, Fallback
 ├── content/
@@ -232,11 +237,11 @@ google-form-auto-fill/
 ├── data/
 │   ├── models.json            # Cơ sở dữ liệu model ngoại tuyến (Gemini, Groq, Hugging Face, OpenAI, Claude, OpenRouter)
 │   └── models.js              # Module xuất dữ liệu model
-├── scratch/                   # Bộ kiểm thử tự động (17 unit test suites)
+├── scratch/                   # Bộ kiểm thử tự động (18 unit test suites)
 ├── icons/                     # Bộ biểu tượng tiện ích (16x16, 48x48, 128x128)
 ├── test/
 │   └── mock-form.html         # Form HTML giả lập Google Forms để kiểm thử offline
-└── README.md                  # Tài liệu hướng dẫn sử dụng và cài đặt phiên bản 2.0
+└── README.md                  # Tài liệu hướng dẫn sử dụng và cài đặt phiên bản 2.0.1
 ```
 
 ---
