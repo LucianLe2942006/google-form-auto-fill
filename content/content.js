@@ -432,9 +432,27 @@
       }
     }
 
+    // GATEKEEPER 3: Nếu còn nút "Quay lại" (Back) -> Đang ở các trang giữa (trang 2, 3... có đuôi /formResponse), CẤM kết luận hoàn thành!
+    const backBtn = typeof isBackButton === 'function'
+      ? Array.from(document.querySelectorAll('div[role="button"]')).find(b => isBackButton(b))
+      : document.querySelector('.kW9Bec, .xK37zc');
+    if (backBtn) {
+      return false;
+    }
+
+    // GATEKEEPER 4: Nếu còn nút "Xóa hết câu trả lời" -> CẤM kết luận hoàn thành!
+    const allButtons = Array.from(document.querySelectorAll('div[role="button"], button'));
+    const clearBtn = allButtons.find(b => {
+      const t = (b.textContent || b.innerText || '').trim().toLowerCase();
+      return t === 'xóa hết câu trả lời' || t === 'clear form';
+    });
+    if (clearBtn) {
+      return false;
+    }
+
+    // ĐIỀU KIỆN 1 (URL đặc thù): /alreadyResponsive (trang thông báo đã gửi phản hồi)
     const href = window.location.href || '';
-    // ĐIỀU KIỆN 1 (URL): window.location.href.includes('/formResponse')
-    if (href.includes('/formResponse') || href.includes('/alreadyResponsive')) {
+    if (href.includes('/alreadyResponsive')) {
       return true;
     }
 
@@ -445,8 +463,7 @@
       return true;
     }
 
-    // 2.2. Tiêu đề (div[role="heading"], .M7eMe) có nội dung khớp chính xác:
-    // "Câu trả lời của bạn đã được ghi lại." hoặc "Your response has been recorded."
+    // 2.2. Tiêu đề / Nội dung xác nhận chính xác của Google Forms
     const headings = document.querySelectorAll('div[role="heading"], .M7eMe, div, span');
     for (const el of headings) {
       if (el.children && el.children.length > 2) continue;
@@ -455,8 +472,27 @@
         text === 'Câu trả lời của bạn đã được ghi lại.' ||
         text === 'Your response has been recorded.' ||
         text === 'Câu trả lời của bạn đã được ghi lại' ||
-        text === 'Your response has been recorded'
+        text === 'Your response has been recorded' ||
+        text === 'Câu trả lời của bạn đã được ghi nhận.' ||
+        text === 'Câu trả lời của bạn đã được ghi nhận'
       ) {
+        return true;
+      }
+    }
+
+    // 2.3. Link gửi câu trả lời khác đặc thù trên màn hình hoàn tất
+    const submitAnotherLink = document.querySelector('a[href*="/viewform"], .c2gzEf a, .freebirdFormviewerViewResponseLinksContainer a');
+    if (submitAnotherLink) {
+      const linkText = (submitAnotherLink.textContent || submitAnotherLink.innerText || '').toLowerCase();
+      if (linkText.includes('câu trả lời khác') || linkText.includes('another response') || linkText.includes('chỉnh sửa') || linkText.includes('edit your response')) {
+        return true;
+      }
+    }
+
+    // 2.4. Khi ở URL /formResponse: CHỈ coi là hoàn thành khi thẻ form đã biến mất và không có nút quay lại
+    if (href.includes('/formResponse')) {
+      const activeForm = document.querySelector('form');
+      if (!activeForm && !backBtn) {
         return true;
       }
     }
@@ -1416,9 +1452,14 @@
       const activeSession = local?.formmind_active_session;
       const rawFormUrl = (local?.formmind_form_url || '').trim();
 
-      // 0. If an active multi-page session is in progress, NEVER start cooldown!
+      // 0. If an active multi-page session is in progress, check if form is completed
       if (activeSession && activeSession.inProgress && (Date.now() - (activeSession.lastUpdated || activeSession.startedAt || 0) < 180000)) {
-        return;
+        if (typeof isFormCompleted === 'function' && isFormCompleted()) {
+          console.log('[FormMind] Active session found on completed form. Purging session to allow cooldown.');
+          chrome.storage.local.remove('formmind_active_session');
+        } else {
+          return;
+        }
       }
 
       // =========================================================================
@@ -1426,8 +1467,8 @@
       // =========================================================================
       if (autoStart) {
         const currentHref = window.location.href || '';
-        // Nếu đang ở trang kết quả /formResponse hoặc đã hoàn thành: lập tức chuyển hướng về /viewform
-        if (currentHref.includes('/formResponse') || isFormCompleted()) {
+        // Nếu đang ở trang kết quả đã hoàn thành: lập tức chuyển hướng về /viewform
+        if (isFormCompleted()) {
           const targetUrl = resolveTargetFormUrl(rawFormUrl);
           console.log('[FormMind] autoStart flag detected on result page. Redirecting to form:', targetUrl);
           if (targetUrl && targetUrl.startsWith('http') && !targetUrl.includes('/formResponse')) {
@@ -1521,6 +1562,30 @@
         return;
       }
 
+      // CHỐT CHẶN 1: Nếu form đã hoàn thành (isFormCompleted), TUYỆT ĐỐI không resume, dọn session và dừng lại
+      if (typeof isFormCompleted === 'function' && isFormCompleted()) {
+        console.log('[FormMind] Form is already completed. Clearing active session.');
+        chrome.storage.local.remove('formmind_active_session');
+        return;
+      }
+
+      // Wait for questions to be mounted in the DOM
+      const waitResult = await waitForQuestionsOnPage(8000);
+
+      // CHỐT CHẶN 2: Sau khi chờ DOM, kiểm tra lại nếu form đã hoàn tất
+      if (typeof isFormCompleted === 'function' && isFormCompleted()) {
+        console.log('[FormMind] Form is completed after waiting for DOM. Clearing active session.');
+        chrome.storage.local.remove('formmind_active_session');
+        return;
+      }
+
+      // CHỐT CHẶN 3: Nếu sau 8s không có bất kỳ câu hỏi hoặc nút chuyển trang nào, dọn session và dừng lại
+      if (!waitResult || !waitResult.success) {
+        console.log('[FormMind] No questions or navigation buttons found after 8s. Terminating resume attempt.');
+        chrome.storage.local.remove('formmind_active_session');
+        return;
+      }
+
       console.log(`[FormMind] Resuming active multi-page session at Page ${session.pageNumber}...`);
       const resumeMsg = `📄 Đang tiếp tục tự động điền trang ${session.pageNumber}...`;
       showToast(resumeMsg, 'info');
@@ -1544,9 +1609,6 @@
           message: resumeMsg
         }
       });
-
-      // Wait for questions to be mounted in the DOM
-      await waitForQuestionsOnPage(8000);
 
       await runMultiPageAutoFill({
         selectedPersona: session.persona,
@@ -3845,6 +3907,14 @@
         return { action: 'completed', count: subResult.count, totalPages: pageNumber };
       }
 
+      // B.2.5. Nếu trang hiện tại là màn hình xác nhận đã hoàn tất form
+      if (typeof isFormCompleted === 'function' && isFormCompleted()) {
+        chrome.storage.local.remove('formmind_active_session');
+        const compMsg = `✨ Form đã được nộp hoàn tất!`;
+        if (onProgress) onProgress({ status: 'completed', page: pageNumber, totalFilled: totalFilledAcrossAllPages, message: compMsg });
+        return { action: 'completed', count: totalFilledAcrossAllPages, totalPages: pageNumber };
+      }
+
       // B.3. Hoàn toàn không tìm thấy câu hỏi hoặc nút điều hướng
       chrome.storage.local.remove('formmind_active_session');
       const noQMsg = `Không tìm thấy câu hỏi hoặc nút chuyển trang ở trang ${pageNumber}.`;
@@ -3866,8 +3936,9 @@
     const progressMsg = `Đang tạo câu trả lời cho trang ${pageNumber} (${questions.length} câu)...`;
     try {
       if (chrome?.storage?.local) {
-        chrome.storage.local.get(['formmind_active_session'], (res) => {
-          if (res?.formmind_active_session?.inProgress) {
+        const res = await new Promise(r => chrome.storage.local.get(['formmind_active_session'], r));
+        if (res?.formmind_active_session?.inProgress) {
+          await new Promise(r => {
             chrome.storage.local.set({
               formmind_active_session: {
                 ...res.formmind_active_session,
@@ -3876,9 +3947,9 @@
                 totalFilled: totalFilledAcrossAllPages,
                 lastUpdated: Date.now()
               }
-            });
-          }
-        });
+            }, r);
+          });
+        }
       }
     } catch (e) {}
 
@@ -4031,23 +4102,33 @@
     const currentTotalFilled = totalFilledAcrossAllPages + newFilledCount;
 
     const filledMsg = `Trang ${pageNumber} đã điền (${newFilledCount}/${questions.length} câu)!`;
-    try {
-      if (chrome?.storage?.local) {
-        chrome.storage.local.get(['formmind_active_session'], (res) => {
+
+    // 4. Kiểm tra nút chuyển trang (Next) hoặc nút nộp (Submit)
+    const pageNextBtn = findNextButton();
+    const pageSubmitBtn = findSubmitButton();
+
+    // CHỈ CẬP NHẬT active session nếu còn trang tiếp theo (có nút Next).
+    // Nếu đây là trang cuối chuẩn bị nộp bài (không có nút Next), KHÔNG ghi lại active session để tránh race condition khi submit!
+    if (pageNextBtn) {
+      try {
+        if (chrome?.storage?.local) {
+          const res = await new Promise(r => chrome.storage.local.get(['formmind_active_session'], r));
           if (res?.formmind_active_session?.inProgress) {
-            chrome.storage.local.set({
-              formmind_active_session: {
-                ...res.formmind_active_session,
-                statusMessage: filledMsg,
-                pageNumber: pageNumber,
-                totalFilled: currentTotalFilled,
-                lastUpdated: Date.now()
-              }
+            await new Promise(r => {
+              chrome.storage.local.set({
+                formmind_active_session: {
+                  ...res.formmind_active_session,
+                  statusMessage: filledMsg,
+                  pageNumber: pageNumber,
+                  totalFilled: currentTotalFilled,
+                  lastUpdated: Date.now()
+                }
+              }, r);
             });
           }
-        });
-      }
-    } catch (e) {}
+        }
+      } catch (e) {}
+    }
 
     if (onProgress) {
       onProgress({
@@ -4058,10 +4139,6 @@
         message: filledMsg
       });
     }
-
-    // 4. Kiểm tra nút chuyển trang (Next) hoặc nút nộp (Submit)
-    const pageNextBtn = findNextButton();
-    const pageSubmitBtn = findSubmitButton();
 
     if (pageNextBtn) {
       if (!autoAdvance) {
