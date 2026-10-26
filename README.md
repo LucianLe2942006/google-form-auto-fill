@@ -238,7 +238,7 @@ google-form-auto-fill/
 │   ├── models.json            # Cơ sở dữ liệu model ngoại tuyến (Gemini, Groq, Hugging Face, OpenAI, Claude, OpenRouter)
 │   └── models.js              # Module xuất dữ liệu model
 ├── scratch/                   # Bộ kiểm thử tự động (18 unit test suites)
-├── icons/                     # Bộ biểu tượng tiện ích (16x16, 48x48, 128x128)
+├── icons/                     # Bộ biểu tượng nhận diện FormMind (16x16, 32x32, 48x48, 128x128, 512x512, logo.svg)
 ├── test/
 │   └── mock-form.html         # Form HTML giả lập Google Forms để kiểm thử offline
 └── README.md                  # Tài liệu hướng dẫn sử dụng và cài đặt phiên bản 2.0.1

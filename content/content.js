@@ -2967,7 +2967,20 @@
     widget.innerHTML = `
       <div class="fmind-pill" id="fmind-pill-container">
         <div class="fmind-logo-badge" id="fmind-badge" title="FormMind AI Assistant - Bấm để xem trợ giúp">
-          <span class="fmind-sparkle-icon">✨</span>
+          <svg class="fmind-brand-icon" width="18" height="18" viewBox="0 0 128 128" fill="none">
+            <rect x="8" y="8" width="112" height="112" rx="26" fill="#1e1b4b" stroke="#a855f7" stroke-width="6"/>
+            <!-- Form -->
+            <rect x="24" y="28" width="50" height="70" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="6"/>
+            <path d="M34 50l4 4 8-8 M34 72l4 4 8-8" stroke="#38bdf8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="52" y1="50" x2="66" y2="50" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+            <line x1="52" y1="72" x2="66" y2="72" stroke="#94a3b8" stroke-width="6" stroke-linecap="round"/>
+            <!-- Brain / Mind -->
+            <path d="M 66 48 C 64 34, 76 22, 90 22 C 102 22, 112 30, 112 42 C 120 45, 122 56, 116 66 C 120 76, 114 86, 104 88 C 96 96, 82 96, 76 88 L 76 104" stroke="#c084fc" stroke-width="7" stroke-linecap="round" fill="none"/>
+            <circle cx="82" cy="36" r="5" fill="#ffffff"/>
+            <circle cx="100" cy="48" r="5" fill="#67e8f9"/>
+            <circle cx="86" cy="68" r="5" fill="#f472b6"/>
+            <path d="M 90 38 L 86 48 L 94 48 L 88 60" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
           <span>FormMind</span>
         </div>
         <select class="fmind-select-model" id="fmind-quick-model" title="Chọn AI Model để điền">

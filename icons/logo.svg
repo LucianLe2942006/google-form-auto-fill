@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Background Card Gradient -->
+    <linearGradient id="fmind-card-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="0.95"/>
+      <stop offset="50%" stop-color="#0f172a" stop-opacity="0.98"/>
+      <stop offset="100%" stop-color="#090d16" stop-opacity="1"/>
+    </linearGradient>
+
+    <!-- Card Rim / Border Gradient -->
+    <linearGradient id="fmind-card-border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.7"/>
+    </linearGradient>
+
+    <!-- Form Glassmorphic Gradient -->
+    <linearGradient id="fmind-form-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.7"/>
+    </linearGradient>
+
+    <!-- Brain Neural Circuit Gradient -->
+    <linearGradient id="fmind-brain-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f472b6"/>
+      <stop offset="35%" stop-color="#c084fc"/>
+      <stop offset="70%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+
+    <!-- Glow Lightning / Spark Gradient -->
+    <linearGradient id="fmind-spark-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+
+    <!-- Ambient Backlight Filter -->
+    <filter id="fmind-glow-soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="fmind-glow-intense" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="blur1"/>
+      <feGaussianBlur stdDeviation="6" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Base Squircle Container -->
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#fmind-card-bg)" stroke="url(#fmind-card-border)" stroke-width="2"/>
+
+  <!-- Inner Ambient Aura -->
+  <circle cx="82" cy="50" r="32" fill="#8b5cf6" opacity="0.22" filter="url(#fmind-glow-soft)"/>
+  <circle cx="44" cy="74" r="26" fill="#06b6d4" opacity="0.18" filter="url(#fmind-glow-soft)"/>
+
+  <!-- ================= FORM ELEMENT (Smart Sheet) ================= -->
+  <g id="form-sheet" filter="url(#fmind-glow-soft)">
+    <!-- Sheet background & border -->
+    <rect x="22" y="26" width="54" height="74" rx="10" fill="#0f172a" fill-opacity="0.65" stroke="url(#fmind-form-grad)" stroke-width="2.5"/>
+
+    <!-- Sheet Header Line -->
+    <rect x="30" y="34" width="22" height="4" rx="2" fill="#38bdf8" opacity="0.9"/>
+
+    <!-- Item 1: Checkbox + Line -->
+    <rect x="30" y="46" width="12" height="12" rx="3" stroke="#38bdf8" stroke-width="1.8" fill="rgba(56, 189, 248, 0.15)"/>
+    <path d="M33 52l2.2 2.5 4.8-4.8" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="48" y1="52" x2="66" y2="52" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- Item 2: Checkbox + Line -->
+    <rect x="30" y="65" width="12" height="12" rx="3" stroke="#818cf8" stroke-width="1.8" fill="rgba(129, 140, 248, 0.15)"/>
+    <path d="M33 71l2.2 2.5 4.8-4.8" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="48" y1="71" x2="62" y2="71" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- Item 3: Checkbox + Line -->
+    <rect x="30" y="84" width="12" height="12" rx="3" stroke="#c084fc" stroke-width="1.8" fill="rgba(192, 132, 252, 0.15)"/>
+    <path d="M33 90l2.2 2.5 4.8-4.8" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="48" y1="90" x2="68" y2="90" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- ================= MIND ELEMENT (Neural AI Brain) ================= -->
+  <g id="mind-brain" filter="url(#fmind-glow-intense)">
+    <!-- Outer Brain Lobes Silhouette (Stylized Cybernetic Contour) -->
+    <path d="M 64 48
+             C 62 36, 74 24, 88 24
+             C 99 24, 108 31, 109 40
+             C 117 42, 122 51, 118 60
+             C 122 69, 117 79, 108 81
+             C 102 89, 90 92, 84 86
+             C 80 91, 74 98, 74 104"
+          stroke="url(#fmind-brain-grad)" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Stylus / Neural Flow Connecting to Form -->
+    <path d="M 74 86
+             L 74 104
+             C 74 107, 71 109, 68 107
+             L 66 105"
+          stroke="url(#fmind-brain-grad)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Internal Neural Synapses / Lightning Pathways -->
+    <path d="M 80 34 Q 86 42 76 52 T 88 66"
+          stroke="url(#fmind-spark-grad)" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+    <path d="M 96 32 Q 94 44 104 50 T 96 68"
+          stroke="url(#fmind-spark-grad)" stroke-width="2" stroke-linecap="round" fill="none"/>
+
+    <path d="M 76 52 L 94 52"
+          stroke="url(#fmind-spark-grad)" stroke-width="1.8" stroke-linecap="round"/>
+
+    <path d="M 88 66 Q 84 76 74 84"
+          stroke="url(#fmind-spark-grad)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+
+    <!-- Synaptic Nodes (Glowing Data Points) -->
+    <circle cx="80" cy="34" r="2.8" fill="#ffffff" stroke="#c084fc" stroke-width="1.5"/>
+    <circle cx="96" cy="32" r="2.8" fill="#ffffff" stroke="#60a5fa" stroke-width="1.5"/>
+    <circle cx="76" cy="52" r="3.2" fill="#67e8f9" stroke="#ffffff" stroke-width="1.2"/>
+    <circle cx="94" cy="52" r="3.2" fill="#c084fc" stroke="#ffffff" stroke-width="1.2"/>
+    <circle cx="104" cy="50" r="2.8" fill="#ffffff" stroke="#2dd4bf" stroke-width="1.5"/>
+    <circle cx="88" cy="66" r="3" fill="#ffffff" stroke="#f472b6" stroke-width="1.5"/>
+    <circle cx="96" cy="68" r="2.6" fill="#38bdf8" stroke="#ffffff" stroke-width="1.2"/>
+    <circle cx="74" cy="84" r="3.4" fill="#a855f7" stroke="#ffffff" stroke-width="1.5"/>
+  </g>
+
+  <!-- ================= ENERGY SPARKS & LIGHTNING ================= -->
+  <!-- Lightning flash inside brain -->
+  <path d="M 90 40 L 86 48 L 92 48 L 87 58"
+        stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" filter="url(#fmind-glow-soft)"/>
+
+  <!-- Star Sparks -->
+  <g fill="#ffffff" filter="url(#fmind-glow-soft)">
+    <!-- Top-right star -->
+    <path d="M 112 26 Q 112 30 116 30 Q 112 30 112 34 Q 112 30 108 30 Q 112 30 112 26 Z"/>
+    <!-- Bottom-left star -->
+    <path d="M 16 78 Q 16 81 19 81 Q 16 81 16 84 Q 16 81 13 81 Q 16 81 16 78 Z"/>
+    <!-- Center floating mini-sparkle -->
+    <circle cx="68" cy="20" r="1.5" fill="#fde047"/>
+    <circle cx="118" cy="74" r="1.2" fill="#67e8f9"/>
+  </g>
+</svg>
